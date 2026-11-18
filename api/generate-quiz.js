@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     if (base64Data.length > 4300000) return json(res, 413, { error: 'ပုံဖိုင်အရွယ်အစား ကြီးလွန်းနေပါသည်။ 3MB အောက် ပုံကိုသုံးပါ။' });
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) return json(res, 415, { error: 'JPEG, PNG, WebP ပုံများကိုသာ လက်ခံပါသည်။' });
 
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
     const prompt = `You are an expert school assessment writer. Read the attached educational image and create a useful quiz. ${String(customInstruction).slice(0, 1200)}
 Return ONLY valid JSON with this schema: {"title":"string","description":"string","questions":[{"type":"mcq"|"written","text":"string","marks":2,"options":["A","B","C","D"],"correctOption":0}]}. For every MCQ provide exactly four options and correctOption as zero-based integer 0..3. Written questions must have type written, options [], correctOption null. Use the language of the source where possible. Create 5-12 questions when the image supports it. Do not invent facts not supported by the image.`;
 
