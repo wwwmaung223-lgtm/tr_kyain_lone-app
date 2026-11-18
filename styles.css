@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root{font-family:'DM Sans','Noto Sans Myanmar',system-ui,sans-serif;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;color:#172033;background:#eef2ff;font-optical-sizing:auto}
+*{box-sizing:border-box}html{min-width:320px;scroll-behavior:smooth}body{margin:0;min-width:320px;min-height:100vh}button,input,textarea,select{font:inherit}button{touch-action:manipulation}::selection{background:#c7d2fe;color:#312e81}input:focus,textarea:focus,select:focus{outline:none}#root{min-height:100vh}
+/* Premium finishing layer */
+.ios-glass,.ios-glass-strong{transition:box-shadow .22s ease,border-color .22s ease}.ios-glass:hover{border-color:rgba(165,180,252,.72);box-shadow:0 16px 38px -16px rgba(49,46,129,.2),inset 0 1px 0 #fff}.ios-glass-strong{box-shadow:0 22px 55px -24px rgba(49,46,129,.22),inset 0 1px 0 #fff}.ios-glass-strong:focus-within{border-color:rgba(129,140,248,.7)}
+button{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:active{transform:scale(.985)}button:disabled{cursor:not-allowed}input,textarea{max-width:100%}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
