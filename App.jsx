@@ -151,23 +151,19 @@ const parseShortCodeFromInput = (rawInput, expectedPrefix) => {
 };
 
 // ============================================================================
-// GEMINI AI MULTIMODAL PHOTO-TO-QUIZ EXTRACTOR (gemini-2.5-flash)
+// ASYNC N8N MULTIMODAL PHOTO/PDF-TO-QUIZ GENERATOR
 // ============================================================================
-const generateQuizFromImageWithGemini = async (base64Data, mimeType, customInstruction) => {
-  const response = await fetch('/api/generate-quiz', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64Data, mimeType: mimeType || 'image/jpeg', customInstruction })
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || `AI service error (${response.status})`);
-  if (!Array.isArray(result.questions) || result.questions.length === 0) {
-    throw new Error('AI က မေးခွန်းမထုတ်ပေးနိုင်ပါ။ ဓာတ်ပုံကို ပိုရှင်းလင်းစွာ ပြန်တင်ပါ။');
-  }
+const N8N_WEBHOOK_BASE = 'https://myintaung7432.app.n8n.cloud/webhook';
+const N8N_SUBMIT_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-generate-quiz`;
+const N8N_STATUS_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-quiz-status`;
+
+const normalizeGeneratedQuiz = (result) => {
+  const questions = Array.isArray(result?.questions) ? result.questions : [];
+  if (!questions.length) throw new Error('AI က မေးခွန်းမထုတ်ပေးနိုင်ပါ။ ဖိုင်ကို ပြန်စစ်ပြီး ထပ်ကြိုးစားပါ။');
   return {
     title: result.title || 'AI Generated Quiz',
     description: result.description || 'မေးခွန်းအားလုံးကို သေချာစွာ ဖြေဆိုပါ။',
-    questions: result.questions.map((q, idx) => ({
+    questions: questions.map((q, idx) => ({
       id: `ai-q-${Date.now()}-${idx}`,
       type: q.type === 'written' ? 'written' : 'mcq',
       text: String(q.text || ''),
@@ -176,6 +172,38 @@ const generateQuizFromImageWithGemini = async (base64Data, mimeType, customInstr
       correctOption: q.type === 'written' ? null : Number(q.correctOption)
     }))
   };
+};
+
+const generateQuizFromN8n = async (base64Data, mimeType, fileName, customInstruction, onStatus) => {
+  if (!auth?.currentUser) throw new Error('Firebase ဆရာ/ဆရာမ အကောင့်ကို အရင်ဝင်ပါ။');
+  const idToken = await auth.currentUser.getIdToken(true);
+  const submitResponse = await fetch(N8N_SUBMIT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64Data, mimeType, fileName, customInstruction, idToken })
+  });
+  const submitData = await submitResponse.json().catch(() => ({}));
+  if (submitResponse.status !== 202 || !submitData.jobId) {
+    throw new Error(submitData.error || `n8n request failed (${submitResponse.status})`);
+  }
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 5 * 60 * 1000) {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    const freshToken = await auth.currentUser.getIdToken();
+    const statusResponse = await fetch(`${N8N_STATUS_URL}?jobId=${encodeURIComponent(submitData.jobId)}`, {
+      headers: { Authorization: `Bearer ${freshToken}` }
+    });
+    const statusData = await statusResponse.json().catch(() => ({}));
+    if (!statusResponse.ok) throw new Error(statusData.error || `Status check failed (${statusResponse.status})`);
+    const status = statusData.status;
+    onStatus?.(status || 'processing');
+    if (status === 'completed' && statusData.success) return normalizeGeneratedQuiz(statusData);
+    if (status === 'failed' || statusData.success === false) {
+      throw new Error(statusData.error || 'AI မေးခွန်းထုတ်မှု မအောင်မြင်ပါ။');
+    }
+  }
+  throw new Error('မေးခွန်းထုတ်ရန် အချိန်ကြာနေပါသည်။ ခဏနားပြီး ထပ်ကြိုးစားပါ။');
 };
 
 // ============================================================================
@@ -259,6 +287,8 @@ export default function App() {
   const [aiPromptNote, setAiPromptNote] = useState('');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiStatus, setAiStatus] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
 
   // Student Exam Portal States (No Teacher Login Required!)
   const [activeQuiz, setActiveQuiz] = useState(DEFAULT_SAMPLE_QUIZ);
@@ -499,46 +529,65 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
     setAiError('');
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setAiError('JPEG, PNG သို့မဟုတ် WebP ဓာတ်ပုံကိုသာ တင်နိုင်ပါသည်။'); return; }
-    if (file.size > 3 * 1024 * 1024) { setAiError('ဓာတ်ပုံအရွယ်အစား 3MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။'); return; }
+    setAiStatus('');
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setAiError('JPEG, PNG, WebP ဓာတ်ပုံ သို့မဟုတ် PDF ဖိုင်ကိုသာ တင်နိုင်ပါသည်။');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setAiError('ဖိုင်အရွယ်အစား 8MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။');
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result;
-      setUploadedPreview(dataUrl);
-      const [meta, base64] = dataUrl.split(',');
-      const mimeMatch = meta.match(/data:(.*);base64/);
-      setUploadedMime(mimeMatch ? mimeMatch[1] : file.type || 'image/jpeg');
+      setUploadedPreview(file.type === 'application/pdf' ? '' : dataUrl);
+      const [, base64] = dataUrl.split(',');
+      setUploadedMime(file.type);
       setUploadedBase64(base64);
+      setUploadedFileName(file.name);
     };
+    reader.onerror = () => setAiError('ဖိုင်ဖတ်မရပါ။ ထပ်ရွေးကြည့်ပါ။');
     reader.readAsDataURL(file);
   };
 
   const handleRunGeminiPhotoToQuiz = async () => {
     if (!uploadedBase64) {
-      setAiError('မေးခွန်းဓာတ်ပုံ အရင်ရွေးချယ်ပေးပါ ဆရာ/ဆရာမ။');
+      setAiError('မေးခွန်းဓာတ်ပုံ သို့မဟုတ် PDF ဖိုင် အရင်ရွေးချယ်ပေးပါ ဆရာ/ဆရာမ။');
+      return;
+    }
+    if (!auth?.currentUser) {
+      setAiError('AI မေးခွန်းထုတ်ရန် Firebase ဆရာ/ဆရာမ အကောင့်ဖြင့် ဝင်ထားရန် လိုအပ်ပါသည်။');
       return;
     }
 
     setIsAiGenerating(true);
     setAiError('');
+    setAiStatus('queued');
     try {
-      const aiResult = await generateQuizFromImageWithGemini(
+      const aiResult = await generateQuizFromN8n(
         uploadedBase64,
         uploadedMime,
-        aiPromptNote
+        uploadedFileName,
+        aiPromptNote,
+        setAiStatus
       );
-
       setQuizTitle(aiResult.title);
       setQuizDesc(aiResult.description);
       setQuestions(aiResult.questions);
       setGeneratedQuizLink('');
       setGeneratedQuizCode('');
-      notify(`Gemini AI မှ မေးခွန်း ${aiResult.questions.length} ပုဒ် ထုတ်ပေးပြီးပါပြီ ✨`);
+      setAiStatus('completed');
+      notify(`AI မှ မေးခွန်း ${aiResult.questions.length} ပုဒ် ထုတ်ပေးပြီးပါပြီ။ ပြန်စစ်ပြီးမှ သိမ်းဆည်းပါ။`);
     } catch (err) {
       console.error(err);
-      setAiError(err.message || 'AI မေးခွန်းထုတ်ရာတွင် အခက်အခဲရှိပါသည်။ API Key နှင့် Internet ကို စစ်ဆေးပါ။');
-        } finally {
+      setAiStatus('failed');
+      setAiError(err.message || 'AI မေးခွန်းထုတ်ရာတွင် အခက်အခဲရှိပါသည်။');
+    } finally {
       setIsAiGenerating(false);
     }
   };
@@ -1362,12 +1411,12 @@ export default function App() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
                       onChange={handleImageSelect}
                       className="hidden"
                     />
 
-                    {!uploadedPreview ? (
+                    {!uploadedPreview && !uploadedBase64 ? (
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
@@ -1385,11 +1434,15 @@ export default function App() {
                       </button>
                     ) : (
                       <div className="relative rounded-2xl overflow-hidden border border-white shadow-sm bg-slate-900/5">
-                        <img
-                          src={uploadedPreview}
-                          alt="Uploaded Question Sheet"
-                          className="w-full max-h-48 object-cover"
-                        />
+                        {uploadedMime === 'application/pdf' ? (
+                          <div className="w-full py-8 flex flex-col items-center justify-center gap-2 text-indigo-700">
+                            <FileText className="w-12 h-12" />
+                            <span className="text-xs font-bold">PDF ဖိုင် ရွေးချယ်ပြီးပါပြီ</span>
+                            <span className="text-[11px] text-slate-500">{uploadedFileName}</span>
+                          </div>
+                        ) : (
+                          <img src={uploadedPreview} alt="Uploaded Question Sheet" className="w-full max-h-48 object-cover" />
+                        )}
                         <div className="absolute top-2 right-2 flex gap-1.5">
                           <button
                             type="button"
@@ -1397,7 +1450,7 @@ export default function App() {
                             className="px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-slate-800 text-[11px] font-bold shadow-sm flex items-center gap-1"
                           >
                             <ImageIcon className="w-3 h-3 text-indigo-600" />
-                            <span>ပုံပြောင်းမည်</span>
+                            <span>ဖိုင်ပြောင်းမည်</span>
                           </button>
                         </div>
                       </div>
@@ -1411,6 +1464,11 @@ export default function App() {
                       className="w-full px-3.5 py-2.5 rounded-2xl bg-white/85 border border-slate-200/90 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 outline-none"
                     />
 
+                    {isAiGenerating && (
+                      <p className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-3 py-2 rounded-xl">
+                        အခြေအနေ - {aiStatus === 'queued' ? 'တန်းစီနေပါသည်...' : aiStatus === 'retrying' ? 'ပြန်လည်ကြိုးစားနေပါသည်...' : aiStatus === 'completed' ? 'ပြီးပါပြီ' : 'AI က မေးခွန်းများ ဖန်တီးနေပါသည်...'}
+                      </p>
+                    )}
                     {aiError && (
                       <p className="text-[11px] font-semibold text-rose-600 bg-rose-50/90 px-3 py-2 rounded-xl">
                         {aiError}
