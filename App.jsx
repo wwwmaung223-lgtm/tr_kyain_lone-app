@@ -41,11 +41,6 @@ import {
   Eye,
   RotateCcw,
   Pencil,
-  Ruler,
-  Paperclip,
-  Star,
-  BookOpen,
-  Eraser,
   Image as ImageIcon,
   Loader2,
   ChevronRight,
@@ -56,8 +51,7 @@ import {
   UserCheck,
   KeyRound,
   Share2,
-  Hash,
-  Zap
+  Hash
 } from 'lucide-react';
 
 // ============================================================================
@@ -151,28 +145,11 @@ const parseShortCodeFromInput = (rawInput, expectedPrefix) => {
 };
 
 // ============================================================================
-// PHOTO/PDF-TO-QUIZ GENERATOR (Vercel serverless /api/generate-quiz -> Gemini)
+// ASYNC N8N MULTIMODAL PHOTO/PDF-TO-QUIZ GENERATOR
 // ============================================================================
-const AI_ENDPOINT = '/api/generate-quiz';
-
-// ဖုန်းဓာတ်ပုံကြီးတွေကို Vercel ပို့လို့ရအောင် အရွယ်လျှော့ (4.5MB ကန့်သတ်ချက်ကြောင့်)
-const downscaleImageDataUrl = (dataUrl, maxSide = 1800, quality = 0.85) =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * k);
-      canvas.height = Math.round(img.height * k);
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = reject;
-    img.src = dataUrl;
-  });
+const N8N_WEBHOOK_BASE = 'https://myintaung7432.app.n8n.cloud/webhook';
+const N8N_SUBMIT_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-generate-quiz`;
+const N8N_STATUS_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-quiz-status`;
 
 const normalizeGeneratedQuiz = (result) => {
   const questions = Array.isArray(result?.questions) ? result.questions : [];
@@ -191,31 +168,36 @@ const normalizeGeneratedQuiz = (result) => {
   };
 };
 
-const generateQuizFromServer = async (base64Data, mimeType, fileName, customInstruction, onStatus) => {
+const generateQuizFromN8n = async (base64Data, mimeType, fileName, customInstruction, onStatus) => {
   if (!auth?.currentUser) throw new Error('Firebase ဆရာ/ဆရာမ အကောင့်ကို အရင်ဝင်ပါ။');
   const idToken = await auth.currentUser.getIdToken(true);
-  onStatus?.('processing');
-  let response;
-  try {
-    response = await fetch(AI_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64Data, mimeType, fileName, customInstruction, idToken })
+  const submitResponse = await fetch(N8N_SUBMIT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64Data, mimeType, fileName, customInstruction, idToken })
+  });
+  const submitData = await submitResponse.json().catch(() => ({}));
+  if (submitResponse.status !== 202 || !submitData.jobId) {
+    throw new Error(submitData.error || `n8n request failed (${submitResponse.status})`);
+  }
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 5 * 60 * 1000) {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    const freshToken = await auth.currentUser.getIdToken();
+    const statusResponse = await fetch(`${N8N_STATUS_URL}?jobId=${encodeURIComponent(submitData.jobId)}`, {
+      headers: { Authorization: `Bearer ${freshToken}` }
     });
-  } catch {
-    throw new Error('Server ကို ချိတ်ဆက်မရပါ။ အင်တာနက် စစ်ပြီး ပြန်ကြိုးစားပါ။');
+    const statusData = await statusResponse.json().catch(() => ({}));
+    if (!statusResponse.ok) throw new Error(statusData.error || `Status check failed (${statusResponse.status})`);
+    const status = statusData.status;
+    onStatus?.(status || 'processing');
+    if (status === 'completed' && statusData.success) return normalizeGeneratedQuiz(statusData);
+    if (status === 'failed' || statusData.success === false) {
+      throw new Error(statusData.error || 'AI မေးခွန်းထုတ်မှု မအောင်မြင်ပါ။');
+    }
   }
-  if (response.status === 413) {
-    throw new Error('ဖိုင်ကြီးလွန်းပါတယ်။ ဓာတ်ပုံ ပိုသေးအောင် ရိုက်ပါ၊ PDF ဆိုရင် 3MB အောက် ဖြစ်ရပါမယ်။');
-  }
-  let data = {};
-  try { data = await response.json(); } catch {
-    throw new Error(`AI server မတုံ့ပြန်ပါ (${response.status}) - /api/generate-quiz.mjs ကို GitHub ရဲ့ api ဖိုလ်ဒါထဲ တင်ထားလား စစ်ပါ။`);
-  }
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || `AI server error (${response.status})`);
-  }
-  return normalizeGeneratedQuiz(data);
+  throw new Error('မေးခွန်းထုတ်ရန် အချိန်ကြာနေပါသည်။ ခဏနားပြီး ထပ်ကြိုးစားပါ။');
 };
 
 // ============================================================================
@@ -227,6 +209,7 @@ const DEFAULT_SAMPLE_QUIZ = {
   teacherName: 'Tr. Yamin',
   title: 'Grade 10 English - Unit 1 Quick Test',
   description: 'ရွေးဖြေ (MCQ) နှင့် ရေးဖြေ (Written) မေးခွန်းများကို သေချာဖတ်၍ ဖြေဆိုပါ။',
+  worksheetImage: '',
   questions: [
     {
       id: 'q1',
@@ -291,6 +274,13 @@ export default function App() {
   const [myQuizzes, setMyQuizzes] = useState([]);
   const [editingQuizCode, setEditingQuizCode] = useState('');
 
+  // Worksheet Image + Quick Answer Sheet States (No AI Required)
+  const [worksheetImage, setWorksheetImage] = useState('');
+  const [worksheetZoomed, setWorksheetZoomed] = useState(false);
+  const [sheetCount, setSheetCount] = useState(10);
+  const [sheetMode, setSheetMode] = useState('mcq4'); // 'mcq3' | 'mcq4' | 'written'
+  const [sheetDefaultMarks, setSheetDefaultMarks] = useState(1);
+
   // AI Photo Upload States
   const fileInputRef = useRef(null);
   const [uploadedPreview, setUploadedPreview] = useState('');
@@ -346,10 +336,56 @@ export default function App() {
   };
 
   // ==========================================================================
+  // WORKSHEET IMAGE UPLOAD & QUICK ANSWER SHEET BUILDER HANDLERS
+  // ==========================================================================
+  const handleWorksheetUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 800;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setWorksheetImage(canvas.toDataURL('image/jpeg', 0.65));
+        setGeneratedQuizLink('');
+        notify('မေးခွန်းစာရွက်ပုံ တင်ပြီးပါပြီ ✓');
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const generateAnswerSheetQuestions = () => {
+    const count = Math.max(1, Math.min(60, Number(sheetCount) || 1));
+    const isMcq = sheetMode === 'mcq3' || sheetMode === 'mcq4';
+    const optCount = sheetMode === 'mcq4' ? 4 : 3;
+    const letters = Array.from({ length: optCount }, (_, i) => String.fromCharCode(65 + i));
+
+    const built = Array.from({ length: count }, (_, i) => ({
+      id: `ws-q-${Date.now()}-${i + 1}`,
+      type: isMcq ? 'mcq' : 'written',
+      text: `Question ${i + 1} (အပေါ်ပုံကို ကြည့်၍ ဖြေပါ)`,
+      marks: Number(sheetDefaultMarks) || 1,
+      options: isMcq ? letters : [],
+      correctOption: isMcq ? 0 : null
+    }));
+
+    setQuestions(built);
+    setGeneratedQuizLink('');
+    setGeneratedQuizCode('');
+    notify(`Answer Sheet (${count} ပုဒ်) ထုတ်ပေးပြီးပါပြီ ✓`);
+  };
+
+  // ==========================================================================
   // 1. INITIALIZE FIREBASE AUTH (Rule 3: Auth First + Safe Fallback)
   // ==========================================================================
   useEffect(() => {
-    // Remove legacy plaintext teacher-password stores from earlier builds.
     try { window.localStorage.removeItem(LOCAL_KEYS.TEACHERS); window.localStorage.removeItem(LOCAL_KEYS.SESSION); } catch {}
     const localQuizzes = readLocalMap(LOCAL_KEYS.QUIZZES);
     if (!localQuizzes['DEMO26']) {
@@ -454,7 +490,6 @@ export default function App() {
     };
   }, [fbUser]);
 
-  // Filter quizzes and submissions belonging to the logged-in teacher
   const teacherQuizzes = useMemo(() => {
     if (!teacherAccount) return [];
     return myQuizzes.filter(
@@ -469,7 +504,6 @@ export default function App() {
     );
   }, [allSubmissions, teacherAccount]);
 
-  // Auto-select latest submission for grading if none selected
   useEffect(() => {
     if (!selectedSubCode && teacherSubmissions.length > 0) {
       setSelectedSubCode(teacherSubmissions[0].code);
@@ -477,7 +511,7 @@ export default function App() {
   }, [teacherSubmissions, selectedSubCode]);
 
   // ==========================================================================
-  // 4. TEACHER GMAIL + PASSWORD LOGIN / REGISTRATION HANDLERS (Dual-Persistence)
+  // 4. TEACHER GMAIL + PASSWORD LOGIN / REGISTRATION HANDLERS
   // ==========================================================================
   const completeTeacherLogin = (accountObj, welcomeText) => {
     setTeacherAccount(accountObj);
@@ -553,27 +587,13 @@ export default function App() {
       e.target.value = '';
       return;
     }
-    if (file.type === 'application/pdf' && file.size > 3 * 1024 * 1024) {
-      setAiError('PDF ကို 3MB အောက်ဖြစ်အောင် လျှော့ပါ (ဒါမှမဟုတ် ဓာတ်ပုံအဖြစ် တင်ပါ)။');
-      e.target.value = '';
-      return;
-    }
 
     const reader = new FileReader();
-    reader.onload = async () => {
-      let dataUrl = reader.result;
-      let mime = file.type;
-      if (file.type !== 'application/pdf') {
-        try {
-          dataUrl = await downscaleImageDataUrl(dataUrl);
-          mime = 'image/jpeg';
-        } catch {
-          // အရွယ်လျှော့မရရင် မူရင်းအတိုင်း သုံး
-        }
-      }
+    reader.onload = () => {
+      const dataUrl = reader.result;
       setUploadedPreview(file.type === 'application/pdf' ? '' : dataUrl);
       const [, base64] = dataUrl.split(',');
-      setUploadedMime(mime);
+      setUploadedMime(file.type);
       setUploadedBase64(base64);
       setUploadedFileName(file.name);
     };
@@ -595,7 +615,7 @@ export default function App() {
     setAiError('');
     setAiStatus('queued');
     try {
-      const aiResult = await generateQuizFromServer(
+      const aiResult = await generateQuizFromN8n(
         uploadedBase64,
         uploadedMime,
         uploadedFileName,
@@ -618,8 +638,6 @@ export default function App() {
     }
   };
 
-  // ==========================================================================
-  // 6. QUIZ EDITING & SHORT 6-CHAR LINK GENERATION (Dual Cloud + Local)
   // ==========================================================================
   // 6. QUIZ EDITING & SHORT 6-CHAR LINK GENERATION (Cloud Saved)
   // ==========================================================================
@@ -669,6 +687,7 @@ export default function App() {
     setEditingQuizCode(quiz.code);
     setQuizTitle(quiz.title || '');
     setQuizDesc(quiz.description || '');
+    setWorksheetImage(quiz.worksheetImage || '');
     setTimeLimitMinutes(Number(quiz.timeLimitMinutes) || 0);
     setQuestions((quiz.questions || []).map((q) => ({ ...q, options: [...(q.options || [])] })));
     setGeneratedQuizCode('');
@@ -698,8 +717,23 @@ export default function App() {
 
   const handleSaveAndGenerateShortQuiz = async () => {
     if (!teacherAccount) return;
-    if (!quizTitle.trim() || questions.length === 0 || questions.some(q => !q.text.trim() || (q.type === 'mcq' && (q.options.length !== 4 || q.options.some(o => !String(o).trim()) || !Number.isInteger(Number(q.correctOption)) || Number(q.correctOption) < 0 || Number(q.correctOption) > 3)))) {
-      notify('ခေါင်းစဉ်၊ မေးခွန်းစာသား၊ MCQ ရွေးချယ်စရာ ၄ ခုနှင့် အဖြေမှန်ကို စစ်ဆေးပါ။');
+    const isInvalid =
+      !quizTitle.trim() ||
+      questions.length === 0 ||
+      questions.some(
+        (q) =>
+          !q.text.trim() ||
+          (q.type === 'mcq' &&
+            (q.options.length < 2 ||
+              q.options.length > 4 ||
+              q.options.some((o) => !String(o).trim()) ||
+              !Number.isInteger(Number(q.correctOption)) ||
+              Number(q.correctOption) < 0 ||
+              Number(q.correctOption) >= q.options.length))
+      );
+
+    if (isInvalid) {
+      notify('ခေါင်းစဉ်၊ မေးခွန်းစာသား၊ MCQ ရွေးချယ်စရာများနှင့် အဖြေမှန်ကို စစ်ဆေးပါ။');
       return;
     }
 
@@ -712,6 +746,7 @@ export default function App() {
         teacherName: teacherAccount.displayName,
         title: quizTitle.trim(),
         description: quizDesc.trim(),
+        worksheetImage: worksheetImage || '',
         timeLimitMinutes: Number(timeLimitMinutes) || 0,
         teacherUid: teacherAccount.uid || fbUser?.uid || null,
         questions,
@@ -754,7 +789,7 @@ export default function App() {
   };
 
   // ==========================================================================
-  // 7. STUDENT SHORT CODE / HASH LOADER & DIRECT SUBMISSION (Dual Cloud + Local)
+  // 7. STUDENT SHORT CODE / HASH LOADER & DIRECT SUBMISSION
   // ==========================================================================
   const activeQuizTotalMarks = useMemo(
     () => (activeQuiz?.questions || []).reduce((s, q) => s + (Number(q.marks) || 0), 0),
@@ -878,7 +913,6 @@ export default function App() {
         submittedAtMs: Date.now()
       };
 
-      // Save locally first so submission NEVER fails
       const localSubs = readLocalMap(LOCAL_KEYS.SUBMISSIONS);
       localSubs[subCode] = subDoc;
       writeLocalMap(LOCAL_KEYS.SUBMISSIONS, localSubs);
@@ -886,7 +920,6 @@ export default function App() {
         Object.values(localSubs).sort((a, b) => (b.submittedAtMs || 0) - (a.submittedAtMs || 0))
       );
 
-      // Best-effort sync to Firestore
       if (db) {
         try {
           await setDoc(
@@ -945,7 +978,7 @@ export default function App() {
   const selectedSubmission = useMemo(() => {
     const pool = teacherSubmissions;
     return pool.find((s) => s.code === selectedSubCode) || pool[0] || null;
-  }, [teacherSubmissions, allSubmissions, selectedSubCode]);
+  }, [teacherSubmissions, selectedSubCode]);
 
   useEffect(() => {
     if (!selectedSubmission) return;
@@ -997,7 +1030,6 @@ export default function App() {
     if (!selectedSubmission) return;
     setIsSavingGrade(true);
     try {
-      // Update locally immediately
       const localSubs = readLocalMap(LOCAL_KEYS.SUBMISSIONS);
       if (localSubs[selectedSubmission.code]) {
         localSubs[selectedSubmission.code] = {
@@ -1097,30 +1129,16 @@ export default function App() {
     );
   }, [teacherSubmissions, searchQuery]);
 
-  // Determine whether Teacher Gate should be displayed
   const showTeacherAuthGate = (activeTab === 'creator' || activeTab === 'dashboard') && !teacherAccount;
+
+  const displayWorksheetImg = activeQuiz?.worksheetImage || (activeQuiz?.code === generatedQuizCode ? worksheetImage : '');
 
   // ==========================================================================
   // RENDER MOBILE-FIRST iOS 26 VIEWPORT
   // ==========================================================================
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-[#eef4ff] via-[#f7f5ff] to-[#ebf8ff] text-slate-800 flex justify-center selection:bg-indigo-200">
-      {/* Custom Keyframes for Stationery Drift & iOS 26 Glassmorphism */}
       <style>{`
-        @keyframes driftA {
-          0%, 100% { transform: translate(0px, 0px) rotate(-6deg); }
-          33% { transform: translate(16px, -22px) rotate(8deg); }
-          66% { transform: translate(-12px, 14px) rotate(-3deg); }
-        }
-        @keyframes driftB {
-          0%, 100% { transform: translate(0px, 0px) rotate(10deg); }
-          40% { transform: translate(-18px, -16px) rotate(-8deg); }
-          75% { transform: translate(14px, 18px) rotate(5deg); }
-        }
-        @keyframes driftC {
-          0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
-          50% { transform: translate(15px, 20px) rotate(14deg); }
-        }
         .ios-glass {
           background: rgba(255, 255, 255, 0.74);
           backdrop-filter: blur(22px) saturate(180%);
@@ -1137,10 +1155,9 @@ export default function App() {
         }
       `}</style>
 
-
-      {/* Responsive app container (mobile and desktop) */}
+      {/* Responsive app container */}
       <div className="relative z-10 w-full max-w-[1100px] min-h-screen flex flex-col sm:my-4 sm:min-h-[calc(100vh-2rem)] sm:rounded-[42px] sm:border-[6px] sm:border-white/80 sm:shadow-[0_25px_70px_-15px_rgba(79,70,229,0.22)] overflow-x-clip">
-        {/* iOS 26 Dynamic Island / Top Floating Glass Header */}
+        {/* Top Floating Glass Header */}
         <header className="sticky top-0 z-30 px-4 pt-3 pb-2">
           <div className="ios-glass-strong rounded-[26px] px-4 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -1153,7 +1170,7 @@ export default function App() {
                     Tr&apos;s Kyain lone
                   </span>
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-700 border border-indigo-200/60 shrink-0">
-                    AI
+                    Quiz
                   </span>
                 </div>
                 <p className="text-[10px] font-medium text-slate-500 leading-none mt-0.5 truncate">
@@ -1164,7 +1181,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right Header Action: Logout if logged in, or Student Switch */}
             <div className="flex items-center gap-1.5 shrink-0">
               {teacherAccount ? (
                 <button
@@ -1189,7 +1205,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* iOS Floating Notification Pill (Toast) */}
+        {/* Floating Notification Pill (Toast) */}
         {toast && (
           <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[380px]">
             <div className="bg-slate-900/90 backdrop-blur-xl text-white px-4 py-2.5 rounded-full shadow-xl border border-white/15 flex items-center justify-center gap-2 text-xs font-semibold">
@@ -1203,12 +1219,9 @@ export default function App() {
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
-          {/* ================================================================
-              TEACHER GMAIL & PASSWORD AUTHENTICATION + STUDENT QUICK CODE SCREEN
-             ================================================================ */}
           {showTeacherAuthGate ? (
             <div className="pt-1 space-y-4">
-              {/* Prominent Student Quick Access Card (No Login Required!) */}
+              {/* Student Quick Access Card */}
               <div className="ios-glass-strong rounded-[30px] p-4 border-2 border-indigo-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1258,8 +1271,11 @@ export default function App() {
               </div>
 
               {!hasFirebaseConfig && (
-                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">Firebase Project မချိတ်ရသေးပါ။ Student demo ကိုသာ စမ်းနိုင်ပြီး Teacher account / Cloud sync အတွက် Setup လိုအပ်ပါသည်။</div>
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">
+                  Firebase Project မချိတ်ရသေးပါ။ Student demo ကိုသာ စမ်းနိုင်ပြီး Teacher account / Cloud sync အတွက် Setup လိုအပ်ပါသည်။
+                </div>
               )}
+
               {/* Teacher Gmail & Password Login / Register Card */}
               <div className="ios-glass-strong rounded-[32px] p-5 space-y-4">
                 <div className="text-center space-y-1.5">
@@ -1274,7 +1290,6 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Login / Register Segmented Pill */}
                 <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-200/60">
                   <button
                     type="button"
@@ -1385,11 +1400,8 @@ export default function App() {
                     )}
                   </button>
                 </form>
-
-                <p className="text-center text-[10px] text-slate-500">Demo အကောင့်မပါဝင်တော့ပါ။ ကိုယ်ပိုင် Teacher account ဖွင့်ပါ။</p>
               </div>
 
-              {/* Seamless Student Bypass Card */}
               <div className="ios-glass rounded-[26px] p-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-extrabold text-slate-800">
@@ -1412,116 +1424,172 @@ export default function App() {
           ) : (
             <>
               {/* ================================================================
-                  TAB 1: AI PHOTO-TO-QUIZ CREATOR (ဆရာ/ဆရာမ မေးခွန်းထုတ်ရန်)
+                  TAB 1: QUIZ CREATOR (Worksheet Upload + Quick Answer Sheet + AI)
                  ================================================================ */}
               {activeTab === 'creator' && (
                 <>
-                  {/* Hero AI Photo Scanner Card */}
-                  <div className="ios-glass-strong rounded-[28px] p-4 space-y-3.5">
+                  {/* 1. Fast Worksheet Upload + Quick Answer Sheet Card (No AI Fail) */}
+                  <div className="ios-glass-strong rounded-[28px] p-4 space-y-3 border-2 border-indigo-200">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 text-white flex items-center justify-center shadow-xs">
-                          <Wand2 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h1 className="text-sm font-extrabold text-slate-900">
-                            ဓာတ်ပုံမှ AI မေးခွန်းထုတ်မည်
-                          </h1>
-                          <p className="text-[11px] text-slate-500">
-                            စာအုပ် / မေးခွန်းရွက် ဓာတ်ပုံထည့်ရုံဖြင့် Gemini AI မှ ထုတ်ပေးပါမည်
-                          </p>
-                        </div>
+                      <span className="text-xs font-extrabold text-slate-900">
+                        Worksheet ပုံတင် + အဖြေလွှာ (Answer Sheet) ဆောက်မည်
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        100% Instant
+                      </span>
+                    </div>
+
+                    <label className="block w-full py-4 px-4 rounded-2xl border-2 border-dashed border-indigo-400 bg-gradient-to-b from-indigo-50/80 to-sky-50/80 text-center text-xs font-bold text-indigo-900 cursor-pointer hover:border-indigo-600 transition">
+                      {worksheetImage ? '✓ မေးခွန်းစာရွက်ပုံ ပြောင်းရန် နှိပ်ပါ' : '+ မေးခွန်းစာရွက်ပုံ ရွေးချယ်ပါ (ကျောင်းသားများ ကြည့်ဖြေရန်)'}
+                      <input type="file" accept="image/*" onChange={handleWorksheetUpload} className="hidden" />
+                    </label>
+
+                    {worksheetImage && (
+                      <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-300 shadow-md">
+                        <img
+                          src={worksheetImage}
+                          alt="Worksheet preview"
+                          className="w-full max-h-48 object-contain bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setWorksheetImage('')}
+                          className="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-rose-600 text-white text-[10px] font-bold shadow"
+                        >
+                          ပုံဖျက်မည်
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1">မေးခွန်းပုဒ်ရေ</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={sheetCount}
+                          onChange={(e) => setSheetCount(e.target.value)}
+                          className="w-full px-2.5 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-center outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1">အဖြေရွေးစရာ</label>
+                        <select
+                          value={sheetMode}
+                          onChange={(e) => setSheetMode(e.target.value)}
+                          className="w-full px-2 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold outline-none focus:border-indigo-500"
+                        >
+                          <option value="mcq3">A / B / C</option>
+                          <option value="mcq4">A / B / C / D</option>
+                          <option value="written">စာရိုက်ဖြေ</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1">တစ်ပုဒ်မှတ်</label>
+                        <input
+                          type="number"
+                          min="0.5"
+                          step="0.5"
+                          value={sheetDefaultMarks}
+                          onChange={(e) => setSheetDefaultMarks(e.target.value)}
+                          className="w-full px-2.5 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-center outline-none focus:border-indigo-500"
+                        />
                       </div>
                     </div>
 
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
+                    <button
+                      type="button"
+                      onClick={generateAnswerSheetQuestions}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-xs shadow-lg shadow-indigo-300/50 active:scale-[0.98] transition"
+                    >
+                      အောက်မှာ ဖြေရမယ့် Answer Sheet ထုတ်မည်
+                    </button>
+                  </div>
 
-                    {!uploadedPreview && !uploadedBase64 ? (
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-6 px-4 rounded-2xl border-2 border-dashed border-indigo-300/80 bg-gradient-to-b from-indigo-50/60 to-sky-50/60 hover:from-indigo-50 hover:to-sky-50 flex flex-col items-center justify-center gap-2 transition active:scale-[0.98]"
-                      >
-                        <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-indigo-600">
-                          <Camera className="w-6 h-6" />
-                        </div>
-                        <span className="text-xs font-bold text-indigo-950">
-                          မေးခွန်းဓာတ်ပုံ ရွေးမည် / ဓာတ်ပုံရိုက်မည်
-                        </span>
-                        <span className="text-[11px] text-slate-500">
-                          Tap to upload textbook, worksheet, or handwritten photo
-                        </span>
-                      </button>
-                    ) : (
-                      <div className="relative rounded-2xl overflow-hidden border border-white shadow-sm bg-slate-900/5">
-                        {uploadedMime === 'application/pdf' ? (
-                          <div className="w-full py-8 flex flex-col items-center justify-center gap-2 text-indigo-700">
-                            <FileText className="w-12 h-12" />
-                            <span className="text-xs font-bold">PDF ဖိုင် ရွေးချယ်ပြီးပါပြီ</span>
-                            <span className="text-[11px] text-slate-500">{uploadedFileName}</span>
-                          </div>
-                        ) : (
-                          <img src={uploadedPreview} alt="Uploaded Question Sheet" className="w-full max-h-48 object-cover" />
-                        )}
-                        <div className="absolute top-2 right-2 flex gap-1.5">
+                  {/* 2. Optional AI Photo Scanner Card */}
+                  <details className="ios-glass rounded-[26px] p-4">
+                    <summary className="text-xs font-extrabold text-slate-700 cursor-pointer flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Wand2 className="w-4 h-4 text-indigo-600" />
+                        <span>AI ဖြင့် မေးခွန်းစာသား ဖတ်ထုတ်ရန် (Optional)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">နှိပ်၍ဖွင့်ပါ</span>
+                    </summary>
+
+                    <div className="pt-3 space-y-3">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+
+                      {!uploadedPreview && !uploadedBase64 ? (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full py-5 px-4 rounded-2xl border-2 border-dashed border-indigo-300/80 bg-indigo-50/40 flex flex-col items-center justify-center gap-1.5"
+                        >
+                          <Camera className="w-5 h-5 text-indigo-600" />
+                          <span className="text-xs font-bold text-indigo-950">
+                            မေးခွန်းဓာတ်ပုံ / PDF ရွေးမည်
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="relative rounded-2xl overflow-hidden border border-white shadow-sm bg-slate-900/5">
+                          {uploadedMime === 'application/pdf' ? (
+                            <div className="w-full py-6 flex flex-col items-center justify-center gap-1 text-indigo-700">
+                              <FileText className="w-10 h-10" />
+                              <span className="text-xs font-bold">{uploadedFileName}</span>
+                            </div>
+                          ) : (
+                            <img src={uploadedPreview} alt="Uploaded Question Sheet" className="w-full max-h-40 object-cover" />
+                          )}
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="px-2.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-slate-800 text-[11px] font-bold shadow-sm flex items-center gap-1"
+                            className="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-white/90 text-slate-800 text-[11px] font-bold shadow-sm flex items-center gap-1"
                           >
                             <ImageIcon className="w-3 h-3 text-indigo-600" />
                             <span>ဖိုင်ပြောင်းမည်</span>
                           </button>
                         </div>
-                      </div>
-                    )}
-
-                    <input
-                      type="text"
-                      value={aiPromptNote}
-                      onChange={(e) => setAiPromptNote(e.target.value)}
-                      placeholder="AI မှာကြားချက် (ဥပမာ - ရွေးဖြေ ၅ ပုဒ်၊ ရေးဖြေ ၂ ပုဒ် ထုတ်ပေးပါ)"
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-white/85 border border-slate-200/90 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 outline-none"
-                    />
-
-                    {isAiGenerating && (
-                      <p className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-3 py-2 rounded-xl">
-                        အခြေအနေ - {aiStatus === 'queued' ? 'တန်းစီနေပါသည်...' : aiStatus === 'retrying' ? 'ပြန်လည်ကြိုးစားနေပါသည်...' : aiStatus === 'completed' ? 'ပြီးပါပြီ' : 'AI က မေးခွန်းများ ဖန်တီးနေပါသည်...'}
-                      </p>
-                    )}
-                    {aiError && (
-                      <p className="text-[11px] font-semibold text-rose-600 bg-rose-50/90 px-3 py-2 rounded-xl">
-                        {aiError}
-                      </p>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleRunGeminiPhotoToQuiz}
-                      disabled={isAiGenerating}
-                      className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-sky-500 text-white font-bold text-xs shadow-lg shadow-indigo-300/40 flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-60"
-                    >
-                      {isAiGenerating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Gemini AI မှ မေးခွန်းများ ဖန်တီးနေပါသည်...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span>Gemini AI ဖြင့် မေးခွန်းထုတ်မည်</span>
-                        </>
                       )}
-                    </button>
-                  </div>
 
-                  {/* Quiz Title & Quick Summary Card */}
+                      <input
+                        type="text"
+                        value={aiPromptNote}
+                        onChange={(e) => setAiPromptNote(e.target.value)}
+                        placeholder="AI မှာကြားချက် (ဥပမာ - ရွေးဖြေ ၅ ပုဒ် ထုတ်ပေးပါ)"
+                        className="w-full px-3.5 py-2 rounded-2xl bg-white/85 border border-slate-200/90 text-xs text-slate-800 outline-none"
+                      />
+
+                      {isAiGenerating && (
+                        <p className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-3 py-2 rounded-xl">
+                          အခြေအနေ - {aiStatus || 'AI က မေးခွန်းများ ဖန်တီးနေပါသည်...'}
+                        </p>
+                      )}
+                      {aiError && (
+                        <p className="text-[11px] font-semibold text-rose-600 bg-rose-50/90 px-3 py-2 rounded-xl">
+                          {aiError}
+                        </p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleRunGeminiPhotoToQuiz}
+                        disabled={isAiGenerating}
+                        className="w-full py-2.5 px-4 rounded-2xl bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>{isAiGenerating ? 'ဖန်တီးနေပါသည်...' : 'AI ဖြင့် မေးခွန်းထုတ်မည်'}</span>
+                      </button>
+                    </div>
+                  </details>
+
+                  {/* 3. Quiz Title & Quick Summary Card */}
                   <div className="ios-glass rounded-[26px] p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-extrabold text-slate-800">
@@ -1541,6 +1609,7 @@ export default function App() {
                             setGeneratedQuizCode('');
                             setUploadedPreview('');
                             setUploadedBase64('');
+                            setWorksheetImage('');
                           }}
                           className="p-1.5 rounded-full bg-white/80 text-slate-500 hover:text-rose-600"
                           title="Clear All"
@@ -1569,10 +1638,17 @@ export default function App() {
                       className="w-full px-3.5 py-2 rounded-2xl bg-white/80 border border-slate-200/80 text-xs text-slate-700 focus:border-indigo-400 outline-none"
                     />
                     <label className="block text-xs font-bold text-slate-700">စာမေးပွဲအချိန် (မိနစ်) — 0 = အချိန်မကန့်သတ်</label>
-                    <input type="number" min="0" max="300" value={timeLimitMinutes} onChange={(e) => setTimeLimitMinutes(Math.max(0, Math.min(300, Number(e.target.value) || 0)))} className="w-full px-3.5 py-2 rounded-2xl bg-white/80 border border-slate-200/80 text-xs text-slate-700 focus:border-indigo-400 outline-none" />
+                    <input
+                      type="number"
+                      min="0"
+                      max="300"
+                      value={timeLimitMinutes}
+                      onChange={(e) => setTimeLimitMinutes(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
+                      className="w-full px-3.5 py-2 rounded-2xl bg-white/80 border border-slate-200/80 text-xs text-slate-700 focus:border-indigo-400 outline-none"
+                    />
                   </div>
 
-                  {/* Editable Questions List */}
+                  {/* 4. Editable Questions List (အဖြေမှန် ရွေးချယ်သတ်မှတ်ရန်) */}
                   <div className="space-y-3">
                     {questions.map((q, idx) => (
                       <div key={q.id} className="ios-glass rounded-[26px] p-4 space-y-3">
@@ -1588,7 +1664,7 @@ export default function App() {
                                   : 'bg-amber-100/80 text-amber-800'
                               }`}
                             >
-                              {q.type === 'mcq' ? 'ရွေးဖြေ (MCQ)' : 'ရေးဖြေ (Written)'}
+                              {q.type === 'mcq' ? 'ရွေးဖြေ (MCQ) — အဖြေမှန် နှိပ်ရွေးပါ' : 'ရေးဖြေ (Written)'}
                             </span>
                           </div>
 
@@ -1596,10 +1672,11 @@ export default function App() {
                             <div className="flex items-center bg-white/90 px-2 py-1 rounded-full border border-slate-200/80">
                               <input
                                 type="number"
-                                min="1"
+                                min="0.5"
+                                step="0.5"
                                 value={q.marks}
                                 onChange={(e) =>
-                                  updateQuestion(q.id, 'marks', Math.max(1, Number(e.target.value)))
+                                  updateQuestion(q.id, 'marks', Math.max(0.5, Number(e.target.value)))
                                 }
                                 className="w-8 text-center text-xs font-extrabold text-indigo-700 bg-transparent outline-none"
                               />
@@ -1634,7 +1711,7 @@ export default function App() {
                                   <button
                                     type="button"
                                     onClick={() => updateQuestion(q.id, 'correctOption', optIdx)}
-                                    className={`w-6 h-6 rounded-full text-[11px] font-extrabold flex items-center justify-center shrink-0 transition ${
+                                    className={`w-7 h-7 rounded-full text-[11px] font-extrabold flex items-center justify-center shrink-0 transition ${
                                       isCorrect
                                         ? 'bg-emerald-500 text-white shadow-xs'
                                         : 'bg-white text-slate-500 border border-slate-300'
@@ -1698,7 +1775,7 @@ export default function App() {
                       ) : (
                         <>
                           <LinkIcon className="w-4 h-4 text-sky-400" />
-                          <span>{editingQuizCode ? 'ပြင်ဆင်မှု သိမ်းမည်' : 'Save &amp; Short Link တိုတိုလေး ထုတ်မည်'}</span>
+                          <span>{editingQuizCode ? 'ပြင်ဆင်မှု သိမ်းမည်' : 'Save & Short Link တိုတိုလေး ထုတ်မည်'}</span>
                         </>
                       )}
                     </button>
@@ -1715,7 +1792,6 @@ export default function App() {
                           </span>
                         </div>
 
-                        {/* Big Prominent 6-Digit Quiz Code Box */}
                         <div className="bg-white p-3 rounded-2xl border border-emerald-200 flex items-center justify-between">
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">
@@ -1742,14 +1818,14 @@ export default function App() {
                         </div>
 
                         <div className="bg-white/80 px-3 py-1.5 rounded-xl border border-emerald-200/80 text-[10px] font-mono text-slate-600 truncate">
-                          Hash Link: {generatedQuizLink}
+                          Link: {generatedQuizLink}
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() =>
-                              copyToClipboard(generatedQuizLink, 'quiz-short-url', 'Hash Link')
+                              copyToClipboard(generatedQuizLink, 'quiz-short-url', 'Quiz Link')
                             }
                             className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs"
                           >
@@ -1786,38 +1862,36 @@ export default function App() {
                         <span>သင်ဖန်တီးထားသော မေးခွန်းလွှာများ ({teacherQuizzes.length})</span>
                       </p>
                       <div className="space-y-2">
-                        {teacherQuizzes.slice(0, 5).map((qz) => {
-                          return (
-                            <div
-                              key={qz.code}
-                              className="p-2.5 rounded-2xl bg-white/85 border border-slate-200/80 flex items-center justify-between gap-2"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-900 truncate">
-                                  {qz.title}
-                                </p>
-                                <p className="text-[10px] font-mono font-bold text-indigo-600">
-                                  Code: {qz.code} • {qz.questions?.length || 0} ပုဒ်
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button type="button" onClick={() => handleEditQuiz(qz)} className="px-2 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-[10px] font-bold flex items-center gap-1">
-                                  <Pencil className="w-3 h-3" /><span>ပြင်</span>
-                                </button>
-                                <button type="button" onClick={() => handleDeleteQuiz(qz)} className="px-2 py-1.5 rounded-xl bg-rose-50 text-rose-700 text-[10px] font-bold flex items-center gap-1">
-                                  <Trash2 className="w-3 h-3" /><span>ဖျက်</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(buildCleanShortUrl('q', qz.code), `qz-${qz.code}`, `Quiz Link (${qz.code})`)}
-                                  className="px-2 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-[10px] font-bold flex items-center gap-1"
-                                >
-                                  <Share2 className="w-3 h-3" /><span>Link</span>
-                                </button>
-                              </div>
+                        {teacherQuizzes.slice(0, 5).map((qz) => (
+                          <div
+                            key={qz.code}
+                            className="p-2.5 rounded-2xl bg-white/85 border border-slate-200/80 flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {qz.title}
+                              </p>
+                              <p className="text-[10px] font-mono font-bold text-indigo-600">
+                                Code: {qz.code} • {qz.questions?.length || 0} ပုဒ်
+                              </p>
                             </div>
-                          );
-                        })}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button type="button" onClick={() => handleEditQuiz(qz)} className="px-2 py-1.5 rounded-xl bg-amber-50 text-amber-800 text-[10px] font-bold flex items-center gap-1">
+                                <Pencil className="w-3 h-3" /><span>ပြင်</span>
+                              </button>
+                              <button type="button" onClick={() => handleDeleteQuiz(qz)} className="px-2 py-1.5 rounded-xl bg-rose-50 text-rose-700 text-[10px] font-bold flex items-center gap-1">
+                                <Trash2 className="w-3 h-3" /><span>ဖျက်</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(buildCleanShortUrl('q', qz.code), `qz-${qz.code}`, `Quiz Link (${qz.code})`)}
+                                className="px-2 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-[10px] font-bold flex items-center gap-1"
+                              >
+                                <Share2 className="w-3 h-3" /><span>Link</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -1825,11 +1899,11 @@ export default function App() {
               )}
 
               {/* ================================================================
-                  TAB 2: STUDENT EXAM PORTAL (ကျောင်းသား ဖြေဆိုရန် - Login မလိုပါ)
+                  TAB 2: STUDENT EXAM PORTAL (ကျောင်းသား ဖြေဆိုရန်)
                  ================================================================ */}
               {activeTab === 'student' && (
                 <>
-                  {/* Enter Short Quiz Code or Hash Link Bar */}
+                  {/* Enter Short Quiz Code Bar */}
                   <div className="ios-glass rounded-[22px] p-2.5 flex items-center gap-2">
                     <input
                       type="text"
@@ -1911,6 +1985,36 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
+                  {/* Worksheet Image Viewer (Zoomable) */}
+                  {displayWorksheetImg && (
+                    <div className="ios-glass-strong rounded-[28px] p-3 space-y-2 border-2 border-indigo-200">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[11px] font-extrabold text-slate-800">
+                          မေးခွန်းစာရွက် (ပုံကို နှိပ်၍ ချဲ့ကြည့်နိုင်သည်)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setWorksheetZoomed((z) => !z)}
+                          className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold"
+                        >
+                          {worksheetZoomed ? 'ပုံသေးမည်' : 'Zoom ချဲ့မည်'}
+                        </button>
+                      </div>
+                      <div
+                        onClick={() => setWorksheetZoomed((z) => !z)}
+                        className="cursor-zoom-in overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm"
+                      >
+                        <img
+                          src={displayWorksheetImg}
+                          alt="Exam Worksheet"
+                          className={`w-full transition-all duration-300 ${
+                            worksheetZoomed ? 'max-h-[750px] object-contain' : 'max-h-64 object-contain'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Student Questions List */}
                   <div className="space-y-3.5">
@@ -2239,7 +2343,9 @@ export default function App() {
                   {/* Teacher Leaderboard */}
                   {leaderboard.length > 0 && (
                     <div className="ios-glass rounded-[28px] p-4 space-y-2">
-                      <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-2"><Award className="w-4 h-4 text-amber-500" /> အမှတ်အများဆုံး ကျောင်းသားများ</h3>
+                      <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-2">
+                        <Award className="w-4 h-4 text-amber-500" /> အမှတ်အများဆုံး ကျောင်းသားများ
+                      </h3>
                       {leaderboard.map((item, index) => (
                         <div key={item.code} className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2 text-xs">
                           <span className="font-bold text-slate-700">{index + 1}. {item.studentName}</span>
@@ -2274,7 +2380,6 @@ export default function App() {
                     <div className="space-y-2.5">
                       {filteredSubmissions.map((sub) => {
                         const active = sub.code === selectedSubmission?.code;
-                        const shortSubUrl = buildCleanShortUrl('s', sub.code);
                         return (
                           <div
                             key={sub.code}
@@ -2326,7 +2431,14 @@ export default function App() {
                                 <Copy className="w-3 h-3" />
                                 <span>Copy ID</span>
                               </button>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); copyToClipboard(buildCleanShortUrl('s', sub.code), `sub-link-${sub.code}`, 'Result Link'); }} className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  copyToClipboard(buildCleanShortUrl('s', sub.code), `sub-link-${sub.code}`, 'Result Link');
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold flex items-center gap-1"
+                              >
                                 <LinkIcon className="w-3 h-3" /><span>Copy Link</span>
                               </button>
                               <button
@@ -2353,7 +2465,7 @@ export default function App() {
         </main>
 
         {/* ==================================================================
-            iOS 26 BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
+            BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
            ================================================================== */}
         <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-[396px]">
           <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-3 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
@@ -2367,7 +2479,7 @@ export default function App() {
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span className="text-[10px] font-bold">AI မေးခွန်းထုတ်</span>
+              <span className="text-[10px] font-bold">မေးခွန်းထုတ်</span>
             </button>
 
             <button
