@@ -151,11 +151,28 @@ const parseShortCodeFromInput = (rawInput, expectedPrefix) => {
 };
 
 // ============================================================================
-// ASYNC N8N MULTIMODAL PHOTO/PDF-TO-QUIZ GENERATOR
+// PHOTO/PDF-TO-QUIZ GENERATOR (Vercel serverless /api/generate-quiz -> Gemini)
 // ============================================================================
-const N8N_WEBHOOK_BASE = 'https://myintaung7432.app.n8n.cloud/webhook';
-const N8N_SUBMIT_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-generate-quiz`;
-const N8N_STATUS_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-quiz-status`;
+const AI_ENDPOINT = '/api/generate-quiz';
+
+// ဖုန်းဓာတ်ပုံကြီးတွေကို Vercel ပို့လို့ရအောင် အရွယ်လျှော့ (4.5MB ကန့်သတ်ချက်ကြောင့်)
+const downscaleImageDataUrl = (dataUrl, maxSide = 1800, quality = 0.85) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * k);
+      canvas.height = Math.round(img.height * k);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
 
 const normalizeGeneratedQuiz = (result) => {
   const questions = Array.isArray(result?.questions) ? result.questions : [];
@@ -174,36 +191,31 @@ const normalizeGeneratedQuiz = (result) => {
   };
 };
 
-const generateQuizFromN8n = async (base64Data, mimeType, fileName, customInstruction, onStatus) => {
+const generateQuizFromServer = async (base64Data, mimeType, fileName, customInstruction, onStatus) => {
   if (!auth?.currentUser) throw new Error('Firebase ဆရာ/ဆရာမ အကောင့်ကို အရင်ဝင်ပါ။');
   const idToken = await auth.currentUser.getIdToken(true);
-  const submitResponse = await fetch(N8N_SUBMIT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64Data, mimeType, fileName, customInstruction, idToken })
-  });
-  const submitData = await submitResponse.json().catch(() => ({}));
-  if (submitResponse.status !== 202 || !submitData.jobId) {
-    throw new Error(submitData.error || `n8n request failed (${submitResponse.status})`);
-  }
-
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < 5 * 60 * 1000) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    const freshToken = await auth.currentUser.getIdToken();
-    const statusResponse = await fetch(`${N8N_STATUS_URL}?jobId=${encodeURIComponent(submitData.jobId)}`, {
-      headers: { Authorization: `Bearer ${freshToken}` }
+  onStatus?.('processing');
+  let response;
+  try {
+    response = await fetch(AI_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64Data, mimeType, fileName, customInstruction, idToken })
     });
-    const statusData = await statusResponse.json().catch(() => ({}));
-    if (!statusResponse.ok) throw new Error(statusData.error || `Status check failed (${statusResponse.status})`);
-    const status = statusData.status;
-    onStatus?.(status || 'processing');
-    if (status === 'completed' && statusData.success) return normalizeGeneratedQuiz(statusData);
-    if (status === 'failed' || statusData.success === false) {
-      throw new Error(statusData.error || 'AI မေးခွန်းထုတ်မှု မအောင်မြင်ပါ။');
-    }
+  } catch {
+    throw new Error('Server ကို ချိတ်ဆက်မရပါ။ အင်တာနက် စစ်ပြီး ပြန်ကြိုးစားပါ။');
   }
-  throw new Error('မေးခွန်းထုတ်ရန် အချိန်ကြာနေပါသည်။ ခဏနားပြီး ထပ်ကြိုးစားပါ။');
+  if (response.status === 413) {
+    throw new Error('ဖိုင်ကြီးလွန်းပါတယ်။ ဓာတ်ပုံ ပိုသေးအောင် ရိုက်ပါ၊ PDF ဆိုရင် 3MB အောက် ဖြစ်ရပါမယ်။');
+  }
+  let data = {};
+  try { data = await response.json(); } catch {
+    throw new Error(`AI server မတုံ့ပြန်ပါ (${response.status}) - /api/generate-quiz.mjs ကို GitHub ရဲ့ api ဖိုလ်ဒါထဲ တင်ထားလား စစ်ပါ။`);
+  }
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || `AI server error (${response.status})`);
+  }
+  return normalizeGeneratedQuiz(data);
 };
 
 // ============================================================================
@@ -541,13 +553,27 @@ export default function App() {
       e.target.value = '';
       return;
     }
+    if (file.type === 'application/pdf' && file.size > 3 * 1024 * 1024) {
+      setAiError('PDF ကို 3MB အောက်ဖြစ်အောင် လျှော့ပါ (ဒါမှမဟုတ် ဓာတ်ပုံအဖြစ် တင်ပါ)။');
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
+    reader.onload = async () => {
+      let dataUrl = reader.result;
+      let mime = file.type;
+      if (file.type !== 'application/pdf') {
+        try {
+          dataUrl = await downscaleImageDataUrl(dataUrl);
+          mime = 'image/jpeg';
+        } catch {
+          // အရွယ်လျှော့မရရင် မူရင်းအတိုင်း သုံး
+        }
+      }
       setUploadedPreview(file.type === 'application/pdf' ? '' : dataUrl);
       const [, base64] = dataUrl.split(',');
-      setUploadedMime(file.type);
+      setUploadedMime(mime);
       setUploadedBase64(base64);
       setUploadedFileName(file.name);
     };
@@ -569,7 +595,7 @@ export default function App() {
     setAiError('');
     setAiStatus('queued');
     try {
-      const aiResult = await generateQuizFromN8n(
+      const aiResult = await generateQuizFromServer(
         uploadedBase64,
         uploadedMime,
         uploadedFileName,
