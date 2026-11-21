@@ -147,9 +147,7 @@ const parseShortCodeFromInput = (rawInput, expectedPrefix) => {
 // ============================================================================
 // ASYNC N8N MULTIMODAL PHOTO/PDF-TO-QUIZ GENERATOR
 // ============================================================================
-const N8N_WEBHOOK_BASE = 'https://myintaung7432.app.n8n.cloud/webhook';
-const N8N_SUBMIT_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-generate-quiz`;
-const N8N_STATUS_URL = `${N8N_WEBHOOK_BASE}/tr-kyain-lone-quiz-status`;
+// AI generation runs through the same-origin Vercel serverless endpoint.
 
 const normalizeGeneratedQuiz = (result) => {
   const questions = Array.isArray(result?.questions) ? result.questions : [];
@@ -163,41 +161,28 @@ const normalizeGeneratedQuiz = (result) => {
       text: String(q.text || ''),
       marks: Math.max(1, Number(q.marks) || (q.type === 'mcq' ? 2 : 5)),
       options: q.type === 'written' ? [] : (Array.isArray(q.options) && q.options.length === 4 ? q.options : []),
-      correctOption: q.type === 'written' ? null : Number(q.correctOption)
+      correctOption: q.type === 'written' || q.correctOption === null || q.correctOption === undefined || !Number.isInteger(Number(q.correctOption)) ? null : Number(q.correctOption)
     }))
   };
 };
 
-const generateQuizFromN8n = async (base64Data, mimeType, fileName, customInstruction, onStatus) => {
+const generateQuizFromApi = async (base64Data, mimeType, customInstruction, onStatus) => {
   if (!auth?.currentUser) throw new Error('Firebase ဆရာ/ဆရာမ အကောင့်ကို အရင်ဝင်ပါ။');
+  onStatus?.('Gemini AI သို့ ဖိုင်ပို့နေပါသည်...');
   const idToken = await auth.currentUser.getIdToken(true);
-  const submitResponse = await fetch(N8N_SUBMIT_URL, {
+  const response = await fetch('/api/generate-quiz', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64Data, mimeType, fileName, customInstruction, idToken })
+    body: JSON.stringify({ base64Data, mimeType, customInstruction, idToken })
   });
-  const submitData = await submitResponse.json().catch(() => ({}));
-  if (submitResponse.status !== 202 || !submitData.jobId) {
-    throw new Error(submitData.error || `n8n request failed (${submitResponse.status})`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || `AI API request failed (${response.status})`);
   }
-
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < 5 * 60 * 1000) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    const freshToken = await auth.currentUser.getIdToken();
-    const statusResponse = await fetch(`${N8N_STATUS_URL}?jobId=${encodeURIComponent(submitData.jobId)}`, {
-      headers: { Authorization: `Bearer ${freshToken}` }
-    });
-    const statusData = await statusResponse.json().catch(() => ({}));
-    if (!statusResponse.ok) throw new Error(statusData.error || `Status check failed (${statusResponse.status})`);
-    const status = statusData.status;
-    onStatus?.(status || 'processing');
-    if (status === 'completed' && statusData.success) return normalizeGeneratedQuiz(statusData);
-    if (status === 'failed' || statusData.success === false) {
-      throw new Error(statusData.error || 'AI မေးခွန်းထုတ်မှု မအောင်မြင်ပါ။');
-    }
-  }
-  throw new Error('မေးခွန်းထုတ်ရန် အချိန်ကြာနေပါသည်။ ခဏနားပြီး ထပ်ကြိုးစားပါ။');
+  onStatus?.('မေးခွန်းများကို စစ်ဆေးနေပါသည်...');
+  const quiz = normalizeGeneratedQuiz(data);
+  onStatus?.('completed');
+  return quiz;
 };
 
 // ============================================================================
@@ -582,8 +567,8 @@ export default function App() {
       e.target.value = '';
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      setAiError('ဖိုင်အရွယ်အစား 8MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။');
+    if (file.size > 3 * 1024 * 1024) {
+      setAiError('ဖိုင်အရွယ်အစား 3MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။ AI API သို့ ပို့ရာတွင် လုံခြုံစိတ်ချစွာ လက်ခံနိုင်ရန် ကန့်သတ်ထားပါသည်။');
       e.target.value = '';
       return;
     }
@@ -615,10 +600,9 @@ export default function App() {
     setAiError('');
     setAiStatus('queued');
     try {
-      const aiResult = await generateQuizFromN8n(
+      const aiResult = await generateQuizFromApi(
         uploadedBase64,
         uploadedMime,
-        uploadedFileName,
         aiPromptNote,
         setAiStatus
       );
