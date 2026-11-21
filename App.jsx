@@ -2323,7 +2323,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('dashboard')
+              onClick={() => setActiveTab('dashboard')}
               className={`relative py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
