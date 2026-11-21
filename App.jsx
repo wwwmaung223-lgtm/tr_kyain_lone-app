@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import SubscriptionCenter from './SubscriptionCenter.jsx';
 import {
   Camera,
   Sparkles,
@@ -209,7 +210,8 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   // Navigation & Global UI Feedback
-  const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard'
+  const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription'
+  const adminLogoTapRef = useRef({ count: 0, at: 0 });
   const [toast, setToast] = useState('');
   const [copiedId, setCopiedId] = useState('');
 
@@ -970,7 +972,7 @@ export default function App() {
         <header className="sticky top-0 z-30 px-4 pt-3 pb-2">
           <div className="ios-glass-strong rounded-[26px] px-4 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-300/50 shrink-0">
+              <div onClick={() => { const now = Date.now(); const tap = adminLogoTapRef.current; if (now - tap.at > 1800) tap.count = 0; tap.at = now; tap.count += 1; if (tap.count >= 5) { tap.count = 0; setActiveTab(teacherAccount ? 'subscription' : 'creator'); if (!teacherAccount) notify('Admin Panel ဝင်ရန် အရင် Login ဝင်ပါ။'); } }} className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-300/50 shrink-0 cursor-pointer select-none">
                 <GraduationCap className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -1028,7 +1030,9 @@ export default function App() {
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
-          {showTeacherAuthGate ? (
+          {activeTab === 'subscription' && teacherAccount ? (
+            <SubscriptionCenter supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+          ) : showTeacherAuthGate ? (
             <div className="pt-1 space-y-4">
               {/* Student Quick Access Card */}
               <div className="ios-glass-strong rounded-[30px] p-4 border-2 border-indigo-200/80 space-y-3">
@@ -2277,7 +2281,7 @@ export default function App() {
             BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
            ================================================================== */}
         <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-[396px]">
-          <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-3 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
+          <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-4 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
             <button
               type="button"
               onClick={() => setActiveTab('creator')}
@@ -2306,7 +2310,20 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => setActiveTab('subscription')}
+              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+                activeTab === 'subscription'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span className="text-sm">💳</span>
+              <span className="text-[10px] font-bold">Plan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')
               className={`relative py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
