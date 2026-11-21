@@ -1,5 +1,5 @@
 // Vercel serverless function (ESM): ဓာတ်ပုံ/PDF -> quiz (Gemini ကို server ကနေ ခေါ်တယ်၊ n8n မလိုတော့ဘူး)
-// Vercel Environment Variables: GEMINI_API_KEY (လိုတယ်)၊ VITE_FIREBASE_API_KEY (ရှိပြီးသား - ဆရာအကောင့် စစ်ဖို့)
+// Vercel Environment Variables: GEMINI_API_KEY, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
@@ -41,20 +41,18 @@ async function pickModels(key) {
     .map(x => x.name);
 }
 
-async function verifyTeacher(idToken) {
-  const fk = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
-  // Fail closed: never allow anonymous AI generation when Firebase verification is misconfigured.
-  if (!fk || !idToken || typeof idToken !== 'string') return false;
+async function verifyTeacher(accessToken) {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !publishableKey || !accessToken || typeof accessToken !== 'string') return false;
   try {
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(fk)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken })
+    const r = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: publishableKey, Authorization: `Bearer ${accessToken}` }
     });
     if (!r.ok) return false;
-    const data = await r.json().catch(() => ({}));
-    return Array.isArray(data.users) && data.users.length === 1 && !!data.users[0].localId;
-  } catch (e) {
+    const user = await r.json().catch(() => null);
+    return !!(user && user.id && user.email);
+  } catch {
     return false;
   }
 }
@@ -90,7 +88,7 @@ export default async function handler(req, res) {
 
   // စစ်ဆေးရန်: browser မှာ /api/generate-quiz ကို ဖွင့်ကြည့်ရင် key နဲ့ model အခြေအနေ ပြမယ်
   if (req.method === 'GET') {
-    const out = { key_set: !!key, key_length: key ? key.length : 0, firebase_key_set: !!(process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY), models: [], tests: [] };
+    const out = { key_set: !!key, key_length: key ? key.length : 0, supabase_configured: !!((process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) && (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY)), models: [], tests: [] };
     if (!key) { out.hint = 'Vercel Environment Variables မှာ GEMINI_API_KEY မရှိပါ (ထည့်ပြီးရင် Redeploy လုပ်ရမယ်)'; return res.status(200).json(out); }
     try { out.models = await pickModels(key); } catch (e) { out.list_error = e.message; return res.status(200).json(out); }
     for (const m of out.models.slice(0, 4)) {
@@ -109,9 +107,9 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   body = body || {};
-  const { base64Data, mimeType, customInstruction, idToken } = body;
+  const { base64Data, mimeType, customInstruction, accessToken } = body;
 
-  if (!(await verifyTeacher(idToken))) return res.status(401).json({ success: false, error: 'ဆရာ/ဆရာမ အကောင့် အတည်မပြုနိုင်ပါ။ ပြန်ထွက်ပြီး ပြန်ဝင်ပါ။' });
+  if (!(await verifyTeacher(accessToken))) return res.status(401).json({ success: false, error: 'ဆရာ/ဆရာမ အကောင့် အတည်မပြုနိုင်ပါ။ ပြန်ထွက်ပြီး ပြန်ဝင်ပါ။' });
   if (!base64Data || typeof base64Data !== 'string') return res.status(400).json({ success: false, error: 'ဖိုင် မပါလာပါ' });
   // Vercel serverless request bodies are limited; the frontend caps source files at 3MB.
   if (base64Data.length > 4_200_000) return res.status(413).json({ success: false, error: 'ဖိုင်အရွယ်အစား 3MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။' });
