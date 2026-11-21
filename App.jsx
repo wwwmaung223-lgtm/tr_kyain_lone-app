@@ -421,7 +421,7 @@ export default function App() {
     if(!email||!email.includes('@')){setAuthError('Gmail လိပ်စာ မှန်ကန်စွာ ထည့်ပါ။');return;}
     if(password.length<6){setAuthError('Password အနည်းဆုံး ၆ လုံး ထည့်ပါ။');return;}
     setIsAuthLoading(true);
-    try{let result;if(authMode==='register'){const displayName=registerName.trim()||email.split('@')[0];result=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName}}});}else result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(!result.data?.user)throw new Error('အကောင့်အတည်ပြုရန် Email ကို စစ်ဆေးပါ။');const user=result.data.user,displayName=user.user_metadata?.display_name||email.split('@')[0];completeTeacherLogin({email,displayName,uid:user.id},authMode==='register'?`အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`:`ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);}
+    try{let result;if(authMode==='register'){const displayName=registerName.trim()||email.split('@')[0];result=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName}}});}else result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(!result.data?.user)throw new Error('အကောင့်အတည်ပြုရန် Email ကို စစ်ဆေးပါ။');if(authMode==='register'&&!result.data.session)throw new Error('Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပြီးမှ Login ဝင်ပါ။');const user=result.data.user,displayName=user.user_metadata?.display_name||email.split('@')[0];completeTeacherLogin({email,displayName,uid:user.id},authMode==='register'?`အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`:`ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);}
     catch(err){const messages={'User already registered':'ဤ Gmail ဖြင့် အကောင့်ဖွင့်ပြီးသားပါ။ Login ဝင်ပါ။','Invalid login credentials':'Gmail သို့မဟုတ် Password မှားနေပါသည်။','Email not confirmed':'Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပါ။'};setAuthError(messages[err.message]||err.message||'အကောင့်ဝင်ရာတွင် အခက်အခဲရှိပါသည်။');}finally{setIsAuthLoading(false);}
   };
   const handleTeacherLogout=async()=>{try{if(supabase)await supabase.auth.signOut();}catch(err){console.warn('Sign out:',err);}setTeacherAccount(null);setFbUser(null);setLoginPassword('');setGeneratedQuizLink('');setGeneratedQuizCode('');notify('အကောင့်မှ ထွက်လိုက်ပါပြီ');};
@@ -657,7 +657,6 @@ export default function App() {
     try {
       let foundQuiz=null;
       if(supabase){const {data,error}=await supabase.from('published_quizzes').select('student_data').eq('code',code).maybeSingle();if(error)throw error;foundQuiz=data?.student_data||null;}
-      if(!foundQuiz){const localQuizzes=readLocalMap(LOCAL_KEYS.QUIZZES);foundQuiz=localQuizzes[code]||null;}
 
       if (foundQuiz) {
         setActiveQuiz(foundQuiz);
