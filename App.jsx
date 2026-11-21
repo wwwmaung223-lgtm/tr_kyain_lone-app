@@ -413,6 +413,16 @@ export default function App() {
     }
   }, [teacherSubmissions, selectedSubCode]);
 
+  // Complete a successful Supabase teacher sign-in.
+  const completeTeacherLogin = (account, message) => {
+    setFbUser({ id: account.uid, email: account.email });
+    setTeacherAccount(account);
+    setAuthError('');
+    setLoginPassword('');
+    setActiveTab('dashboard');
+    notify(message);
+  };
+
   // ==========================================================================
   // 4. TEACHER GMAIL + PASSWORD LOGIN / REGISTRATION HANDLERS
   const handleTeacherAuthSubmit=async(e)=>{
