@@ -30,7 +30,7 @@ create table if not exists public.payment_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   plan_code text not null check (plan_code in ('monthly','quarterly','half_year','yearly')),
-  amount_mmk integer not null check (amount_mmk > 0),
+  amount_mmk integer not null check ((plan_code = 'monthly' and amount_mmk = 8500) or (plan_code = 'quarterly' and amount_mmk = 22950) or (plan_code = 'half_year' and amount_mmk = 40800) or (plan_code = 'yearly' and amount_mmk = 66300)),
   transaction_last6 text not null check (transaction_last6 ~ '^[A-Za-z0-9]{6}$'),
   receipt_path text,
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
@@ -131,7 +131,7 @@ declare t text;
 begin
   foreach t in array array['teacher_classes','class_students','lesson_plans','question_bank','homework_assignments','homework_submissions'] loop
     execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists %L on public.%I', 'Owners manage own '||t, t);
+    execute format('drop policy if exists %I on public.%I', 'Owners manage own '||t, t);
     execute format(
       'create policy %I on public.%I for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()))',
       'Owners manage own '||t, t
@@ -159,3 +159,22 @@ begin
     execute format('create trigger set_updated_at before update on public.%I for each row execute function public.set_updated_at()', t);
   end loop;
 end $$;
+
+-- Automatically start a 15-day trial for every newly registered teacher.
+create or replace function public.initialize_teacher_trial()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  insert into public.teacher_subscriptions(user_id, plan_code, status)
+  values (new.id, 'monthly', 'trial')
+  on conflict (user_id) do nothing;
+  return new;
+end; $$;
+drop trigger if exists on_auth_user_created_teacher_trial on auth.users;
+create trigger on_auth_user_created_teacher_trial
+after insert on auth.users
+for each row execute function public.initialize_teacher_trial();
+
+-- Backfill trials for accounts that already exist.
+insert into public.teacher_subscriptions(user_id, plan_code, status)
+select id, 'monthly', 'trial' from auth.users
+on conflict (user_id) do nothing;
