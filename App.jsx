@@ -751,15 +751,15 @@ export default function App() {
         Object.values(localSubs).sort((a, b) => (b.submittedAtMs || 0) - (a.submittedAtMs || 0))
       );
 
-      if (db) {
-        try {
-          await setDoc(
-            doc(db, 'artifacts', appId, 'public', 'data', 'submissions', subCode),
-            subDoc
-          );
-        } catch (cloudErr) {
-          console.warn('Cloud submission save fallback:', cloudErr);
-        }
+      if (supabase && activeQuiz.teacherUid) {
+        const { error: submitError } = await supabase.from('quiz_submissions').insert({
+          code: subCode,
+          quiz_code: activeQuiz.code,
+          teacher_id: activeQuiz.teacherUid,
+          submission_data: subDoc,
+          status: 'Pending'
+        });
+        if (submitError) throw submitError;
       }
 
       const shortResUrl = buildCleanShortUrl('s', subCode);
