@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle2, Clock3, CreditCard, ImagePlus, Loader2, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
 const ADMIN_EMAIL = 'myintaung7432@gmail.com';
@@ -21,7 +22,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [admin, setAdmin] = useState(user?.email?.toLowerCase() === ADMIN_EMAIL);
+  const [admin, setAdmin] = useState(false);
   const [signedReceipts, setSignedReceipts] = useState({});
 
   const selected = useMemo(() => PLANS.find(p => p.code === selectedPlan) || PLANS[0], [selectedPlan]);
@@ -40,6 +41,15 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
   };
 
   useEffect(() => { refresh(); }, [user?.id]);
+
+  useEffect(() => {
+    let live = true;
+    if (!user?.id) { setAdmin(false); return; }
+    supabase.rpc('is_platform_admin').then(({ data, error: adminError }) => {
+      if (live) setAdmin(!adminError && data === true);
+    });
+    return () => { live = false; };
+  }, [user?.id, supabase]);
 
   useEffect(() => {
     if (!admin || !payments.length) return;
@@ -88,7 +98,11 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
   const trialEnd = subscription?.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
   const periodEnd = subscription?.current_period_ends_at ? new Date(subscription.current_period_ends_at) : null;
   const remaining = date => date ? Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86400000)) : null;
-  const isAdmin = admin && user?.email?.toLowerCase() === ADMIN_EMAIL;
+  const trialGraceEnd = trialEnd ? new Date(trialEnd.getTime() + 3 * 86400000) : null;
+  const paidGraceEnd = periodEnd ? new Date(periodEnd.getTime() + 3 * 86400000) : null;
+  const graceEnd = subscription?.status === 'trial' ? trialGraceEnd : paidGraceEnd;
+  const isGrace = ['trial','active','grace'].includes(subscription?.status) && graceEnd && graceEnd > new Date() && ((subscription?.status === 'grace') || (subscription?.status === 'trial' && trialEnd <= new Date()) || (subscription?.status === 'active' && periodEnd <= new Date()));
+  const isAdmin = admin;
   const visiblePayments = isAdmin ? payments : payments.filter(p => p.user_id === user.id);
 
   return <div className="space-y-4 pb-8">
@@ -100,9 +114,9 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
       <div className="mt-5 rounded-2xl bg-white/10 border border-white/15 p-4">
         <p className="text-xs text-indigo-100">လက်ရှိအသုံးပြုခွင့်</p>
         {loading ? <p className="mt-2 text-sm">စစ်ဆေးနေသည်...</p> : <>
-          <p className="text-xl font-extrabold mt-1">{subscription?.status === 'admin_free' ? 'Permanent Free' : subscription?.status === 'active' ? 'Active Plan' : subscription?.status === 'trial' ? 'Free Trial' : subscription?.status || 'Plan မရှိသေးပါ'}</p>
+          <p className="text-xl font-extrabold mt-1">{subscription?.status === 'admin_free' ? 'Permanent Free' : isGrace ? 'Grace Period' : subscription?.status === 'active' ? 'Active Plan' : subscription?.status === 'trial' ? 'Free Trial' : subscription?.status || 'Plan မရှိသေးပါ'}</p>
           <p className="text-sm text-indigo-100 mt-1">
-            {subscription?.status === 'active' ? 'သက်တမ်းကျန်: ' + remaining(periodEnd) + ' ရက်' : subscription?.status === 'trial' ? 'Trial ကျန်: ' + remaining(trialEnd) + ' ရက်' : subscription?.status === 'admin_free' ? 'သက်တမ်းကန့်သတ်ချက်မရှိပါ' : 'Plan ရွေးချယ်ပြီး ဝယ်ယူနိုင်ပါပြီ'}
+            {isGrace ? 'Plan သက်တမ်းကုန်နေပါပြီ။ Grace Period ကျန်: ' + remaining(graceEnd) + ' ရက်' : subscription?.status === 'active' ? 'သက်တမ်းကျန်: ' + remaining(periodEnd) + ' ရက်' : subscription?.status === 'trial' ? 'Trial ကျန်: ' + remaining(trialEnd) + ' ရက်' : subscription?.status === 'admin_free' ? 'သက်တမ်းကန့်သတ်ချက်မရှိပါ' : 'Plan ရွေးချယ်ပြီး ဝယ်ယူနိုင်ပါပြီ'}
           </p>
           {periodEnd && subscription?.status === 'active' && <p className="text-xs text-indigo-200 mt-1">သက်တမ်းကုန်မည့်ရက်: {periodEnd.toLocaleDateString()}</p>}
         </>}
@@ -126,7 +140,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
     <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-emerald-600"/><h3 className="font-extrabold">KPay ဖြင့် ငွေပေးချေပါ</h3></div>
       <div className="rounded-2xl bg-slate-50 border p-3 flex gap-3 items-center">
-        <div className="w-16 h-16 rounded-xl bg-white border flex items-center justify-center text-xs text-slate-400">KPay QR</div>
+        <div className="w-28 h-28 rounded-xl bg-white border p-1 flex items-center justify-center"><QRCodeSVG value="hQZLQlpQYXlhQE8C8FACEFECMTFXFgl5GZCGfSYREBAfnwgEAQGfJAEwFE1a1d57aaa52" size={100} level="H" includeMargin /></div>
         <div className="min-w-0"><p className="text-xs text-slate-500">ငွေလက်ခံသူ</p><p className="font-extrabold">{KPay.name}</p><p className="text-sm font-bold">{KPay.phone}</p><p className="text-xs text-indigo-700 font-bold">ပေးချေရမည့်ငွေ: {money(selected.price)}</p></div>
       </div>
       <form onSubmit={submitPayment} className="space-y-3">
