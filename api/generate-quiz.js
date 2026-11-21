@@ -43,14 +43,20 @@ async function pickModels(key) {
 
 async function verifyTeacher(idToken) {
   const fk = process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
-  if (!fk) return true; // key မရှိရင် မစစ်ဘဲ ကျော်
-  if (!idToken) return false;
+  // Fail closed: never allow anonymous AI generation when Firebase verification is misconfigured.
+  if (!fk || !idToken || typeof idToken !== 'string') return false;
   try {
     const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(fk)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken })
     });
-    return r.ok;
-  } catch (e) { return false; }
+    if (!r.ok) return false;
+    const data = await r.json().catch(() => ({}));
+    return Array.isArray(data.users) && data.users.length === 1 && !!data.users[0].localId;
+  } catch (e) {
+    return false;
+  }
 }
 
 function cleanQuestions(raw) {
@@ -63,9 +69,19 @@ function cleanQuestions(raw) {
     if (!isMcq) return { type: 'written', text, marks: Math.max(1, Number(q && q.marks) || 5), options: [], correctOption: null };
     const options = opts.slice(0, 4);
     while (options.length < 4) options.push('None of the above');
-    let c = Number(q.correctOption);
-    if (!Number.isInteger(c) || c < 0 || c > 3) c = 0;
-    return { type: 'mcq', text, marks: Math.max(1, Number(q.marks) || 2), options, correctOption: c };
+    const rawCorrect = q && q.correctOption;
+    const c = typeof rawCorrect === 'string' && /^[A-D]$/i.test(rawCorrect.trim())
+      ? rawCorrect.trim().toUpperCase().charCodeAt(0) - 65
+      : Number(rawCorrect);
+    const validCorrect = rawCorrect !== null && rawCorrect !== undefined &&
+      Number.isInteger(c) && c >= 0 && c < options.length;
+    return {
+      type: 'mcq',
+      text,
+      marks: Math.max(1, Number(q && q.marks) || 2),
+      options,
+      correctOption: validCorrect ? c : null
+    };
   }).filter(Boolean);
 }
 
@@ -96,7 +112,9 @@ export default async function handler(req, res) {
   const { base64Data, mimeType, customInstruction, idToken } = body;
 
   if (!(await verifyTeacher(idToken))) return res.status(401).json({ success: false, error: 'ဆရာ/ဆရာမ အကောင့် အတည်မပြုနိုင်ပါ။ ပြန်ထွက်ပြီး ပြန်ဝင်ပါ။' });
-  if (!base64Data) return res.status(400).json({ success: false, error: 'ဖိုင် မပါလာပါ' });
+  if (!base64Data || typeof base64Data !== 'string') return res.status(400).json({ success: false, error: 'ဖိုင် မပါလာပါ' });
+  // Vercel serverless request bodies are limited; the frontend caps source files at 3MB.
+  if (base64Data.length > 4_200_000) return res.status(413).json({ success: false, error: 'ဖိုင်အရွယ်အစား 3MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။' });
   if (!ALLOWED.includes(mimeType)) return res.status(400).json({ success: false, error: 'JPEG, PNG, WebP သို့မဟုတ် PDF သာ ရပါတယ်' });
 
   let models;
