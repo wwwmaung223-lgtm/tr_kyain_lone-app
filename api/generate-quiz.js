@@ -86,19 +86,13 @@ function cleanQuestions(raw) {
 export default async function handler(req, res) {
   const key = process.env.GEMINI_API_KEY;
 
-  // စစ်ဆေးရန်: browser မှာ /api/generate-quiz ကို ဖွင့်ကြည့်ရင် key နဲ့ model အခြေအနေ ပြမယ်
+  // Public health check only. Never call Gemini from an unauthenticated GET.
   if (req.method === 'GET') {
-    const out = { key_set: !!key, key_length: key ? key.length : 0, supabase_configured: !!((process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) && (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY)), models: [], tests: [] };
-    if (!key) { out.hint = 'Vercel Environment Variables မှာ GEMINI_API_KEY မရှိပါ (ထည့်ပြီးရင် Redeploy လုပ်ရမယ်)'; return res.status(200).json(out); }
-    try { out.models = await pickModels(key); } catch (e) { out.list_error = e.message; return res.status(200).json(out); }
-    for (const m of out.models.slice(0, 4)) {
-      try {
-        const r = await gfetch(`${API}/models/${m}:generateContent`, key, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: 'Reply with the single word OK' }] }] }) }, 15000);
-        const j = await r.json().catch(() => ({}));
-        out.tests.push({ model: m, http: r.status, ok: r.ok, message: r.ok ? 'အလုပ်လုပ်ပါတယ်' : ((j.error && j.error.message) || 'unknown').slice(0, 300) });
-      } catch (e) { out.tests.push({ model: m, ok: false, message: e.message }); }
-    }
-    return res.status(200).json(out);
+    return res.status(200).json({
+      key_set: !!key,
+      supabase_configured: !!((process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) &&
+        (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY))
+    });
   }
 
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'POST only' });
