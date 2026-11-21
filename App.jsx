@@ -1,25 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  onAuthStateChanged
-} from 'firebase/auth';
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  onSnapshot,
-  collection,
-  query,
-  where
-} from 'firebase/firestore';
+import { createClient } from '@supabase/supabase-js';
 import {
   Camera,
   Sparkles,
@@ -55,28 +35,14 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// Firebase setup via Vite environment variables + local demo cache
+// Supabase setup (Auth + Postgres)
 // ============================================================================
-let app = null;
-let auth = null;
-let db = null;
-const appId = 'tr-kyain-lone-app';
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
-
-const hasFirebaseConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
-if (hasFirebaseConfig) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-}
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey);
+const supabase = hasSupabaseConfig ? createClient(supabaseUrl, supabasePublishableKey, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+}) : null;
 
 const LOCAL_KEYS = {
   TEACHERS: 'tr_kyain_lone_teachers',
@@ -167,13 +133,15 @@ const normalizeGeneratedQuiz = (result) => {
 };
 
 const generateQuizFromApi = async (base64Data, mimeType, customInstruction, onStatus) => {
-  if (!auth?.currentUser) throw new Error('Firebase ဆရာ/ဆရာမ အကောင့်ကို အရင်ဝင်ပါ။');
+  if (!supabase) throw new Error('Supabase ချိတ်ဆက်မှု မရှိသေးပါ။');
   onStatus?.('Gemini AI သို့ ဖိုင်ပို့နေပါသည်...');
-  const idToken = await auth.currentUser.getIdToken(true);
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData?.session?.access_token) throw new Error('ဆရာ/ဆရာမ အကောင့်ကို ပြန်ဝင်ပါ။');
+  const accessToken = sessionData.session.access_token;
   const response = await fetch('/api/generate-quiz', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64Data, mimeType, customInstruction, idToken })
+    body: JSON.stringify({ base64Data, mimeType, customInstruction, accessToken })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
@@ -227,7 +195,7 @@ const DEFAULT_SAMPLE_QUIZ = {
 // MAIN MOBILE-FIRST iOS 26 APPLICATION COMPONENT
 // ============================================================================
 export default function App() {
-  // Firebase Auth User
+  // Supabase Auth User
   const [fbUser, setFbUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -368,31 +336,18 @@ export default function App() {
   };
 
   // ==========================================================================
-  // 1. INITIALIZE FIREBASE AUTH (Rule 3: Auth First + Safe Fallback)
+  // 1. INITIALIZE SUPABASE AUTH
   // ==========================================================================
   useEffect(() => {
-    try { window.localStorage.removeItem(LOCAL_KEYS.TEACHERS); window.localStorage.removeItem(LOCAL_KEYS.SESSION); } catch {}
-    const localQuizzes = readLocalMap(LOCAL_KEYS.QUIZZES);
-    if (!localQuizzes['DEMO26']) {
-      localQuizzes['DEMO26'] = { ...DEFAULT_SAMPLE_QUIZ, createdAtMs: Date.now() };
-      writeLocalMap(LOCAL_KEYS.QUIZZES, localQuizzes);
-    }
-    setMyQuizzes(Object.values(localQuizzes));
-    setAllSubmissions(Object.values(readLocalMap(LOCAL_KEYS.SUBMISSIONS)));
+    const localQuizzes=readLocalMap(LOCAL_KEYS.QUIZZES);
+    if(!localQuizzes['DEMO26']){localQuizzes['DEMO26']={...DEFAULT_SAMPLE_QUIZ,createdAtMs:Date.now()};writeLocalMap(LOCAL_KEYS.QUIZZES,localQuizzes);}
+    setMyQuizzes(Object.values(localQuizzes));setAllSubmissions(Object.values(readLocalMap(LOCAL_KEYS.SUBMISSIONS)));
+    if(!supabase){setAuthReady(true);return;}
+    supabase.auth.getSession().then(({data})=>{const user=data?.session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);}).catch(()=>setAuthReady(true));
+    const {data:authListener}=supabase.auth.onAuthStateChange((_event,session)=>{const user=session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);});
+    return()=>authListener.subscription.unsubscribe();
+  },[]);
 
-    if (!auth) {
-      setAuthReady(true);
-      return;
-    }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFbUser(user);
-      setTeacherAccount(user ? { email: user.email, displayName: user.displayName || user.email?.split('@')[0] || 'Teacher', uid: user.uid } : null);
-      setAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // ==========================================================================
   // 2. DETECT HASH / URL PARAMETERS (#q=XXXXXX or #s=XXXXXX) ON LOAD & HASHCHANGE
   // ==========================================================================
   useEffect(() => {
@@ -420,60 +375,23 @@ export default function App() {
   }, [authReady, fbUser]);
 
   // ==========================================================================
-  // 3. SUBSCRIBE TO CLOUD QUIZZES & SUBMISSIONS (Merged with Local Storage)
+  // 3. LOAD TEACHER QUIZZES & SUBMISSIONS FROM SUPABASE
   // ==========================================================================
-  useEffect(() => {
-    const syncFromLocal = () => {
-      const localQ = Object.values(readLocalMap(LOCAL_KEYS.QUIZZES));
-      localQ.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
-      setMyQuizzes(localQ);
-
-      const localS = Object.values(readLocalMap(LOCAL_KEYS.SUBMISSIONS));
-      localS.sort((a, b) => (b.submittedAtMs || 0) - (a.submittedAtMs || 0));
-      setAllSubmissions(localS);
-    };
-
-    syncFromLocal();
-
-    if (!fbUser || !db) return;
-
-    const quizzesCol = query(collection(db, 'artifacts', appId, 'public', 'data', 'quizzes'), where('teacherEmail', '==', fbUser.email));
-    const unsubQuizzes = onSnapshot(
-      quizzesCol,
-      (snapshot) => {
-        const merged = { ...readLocalMap(LOCAL_KEYS.QUIZZES) };
-        snapshot.docs.forEach((d) => {
-          merged[d.id] = { id: d.id, ...d.data() };
-        });
-        writeLocalMap(LOCAL_KEYS.QUIZZES, merged);
-        const list = Object.values(merged);
-        list.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
-        setMyQuizzes(list);
-      },
-      (err) => console.warn('Quizzes listener fallback:', err)
-    );
-
-    const subsCol = query(collection(db, 'artifacts', appId, 'public', 'data', 'submissions'), where('teacherEmail', '==', fbUser.email));
-    const unsubSubs = onSnapshot(
-      subsCol,
-      (snapshot) => {
-        const merged = { ...readLocalMap(LOCAL_KEYS.SUBMISSIONS) };
-        snapshot.docs.forEach((d) => {
-          merged[d.id] = { id: d.id, ...d.data() };
-        });
-        writeLocalMap(LOCAL_KEYS.SUBMISSIONS, merged);
-        const list = Object.values(merged);
-        list.sort((a, b) => (b.submittedAtMs || 0) - (a.submittedAtMs || 0));
-        setAllSubmissions(list);
-      },
-      (err) => console.warn('Submissions listener fallback:', err)
-    );
-
-    return () => {
-      unsubQuizzes();
-      unsubSubs();
-    };
-  }, [fbUser]);
+  useEffect(()=>{
+    let cancelled=false;
+    const loadTeacherData=async()=>{
+      if(!fbUser||!supabase)return;
+      const [qr,sr]=await Promise.all([
+        supabase.from('quiz_assessments').select('quiz_data').eq('teacher_id',fbUser.id).order('created_at',{ascending:false}),
+        supabase.from('quiz_submissions').select('submission_data').eq('teacher_id',fbUser.id).order('created_at',{ascending:false})
+      ]);
+      if(cancelled)return;
+      if(qr.error)console.warn('Supabase quizzes:',qr.error.message);
+      else{const merged={...readLocalMap(LOCAL_KEYS.QUIZZES)};(qr.data||[]).forEach(row=>{if(row.quiz_data?.code)merged[row.quiz_data.code]=row.quiz_data;});writeLocalMap(LOCAL_KEYS.QUIZZES,merged);setMyQuizzes(Object.values(merged).sort((x,y)=>(y.createdAtMs||0)-(x.createdAtMs||0)));}
+      if(sr.error)console.warn('Supabase submissions:',sr.error.message);
+      else{const merged={...readLocalMap(LOCAL_KEYS.SUBMISSIONS)};(sr.data||[]).forEach(row=>{const sub=row.submission_data;if(sub?.code)merged[sub.code]=sub;});writeLocalMap(LOCAL_KEYS.SUBMISSIONS,merged);setAllSubmissions(Object.values(merged).sort((x,y)=>(y.submittedAtMs||0)-(x.submittedAtMs||0)));}
+    };loadTeacherData();return()=>{cancelled=true;};
+  },[fbUser]);
 
   const teacherQuizzes = useMemo(() => {
     if (!teacherAccount) return [];
@@ -497,63 +415,17 @@ export default function App() {
 
   // ==========================================================================
   // 4. TEACHER GMAIL + PASSWORD LOGIN / REGISTRATION HANDLERS
-  // ==========================================================================
-  const completeTeacherLogin = (accountObj, welcomeText) => {
-    setTeacherAccount(accountObj);
-    notify(welcomeText);
-  };
-
-  const handleTeacherAuthSubmit = async (e) => {
-    e.preventDefault();
-    setAuthError('');
-    const email = loginEmail.trim().toLowerCase();
-    const password = loginPassword;
-    if (!auth) {
-      setAuthError('Firebase မချိတ်ဆက်ရသေးပါ။ .env ဖိုင်တွင် Firebase Project အချက်အလက် ဖြည့်ပြီးမှ Teacher account ဖွင့်/ဝင်နိုင်ပါမည်။');
-      return;
-    }
-    if (!email || !email.includes('@')) { setAuthError('Gmail လိပ်စာ မှန်ကန်စွာ ထည့်ပါ။'); return; }
-    if (password.length < 6) { setAuthError('Password အနည်းဆုံး ၆ လုံး ထည့်ပါ။'); return; }
+  const handleTeacherAuthSubmit=async(e)=>{
+    e.preventDefault();setAuthError('');const email=loginEmail.trim().toLowerCase(),password=loginPassword;
+    if(!supabase){setAuthError('Supabase ချိတ်ဆက်မှု မရှိသေးပါ။ Vercel Environment Variables ကို စစ်ပါ။');return;}
+    if(!email||!email.includes('@')){setAuthError('Gmail လိပ်စာ မှန်ကန်စွာ ထည့်ပါ။');return;}
+    if(password.length<6){setAuthError('Password အနည်းဆုံး ၆ လုံး ထည့်ပါ။');return;}
     setIsAuthLoading(true);
-    try {
-      if (authMode === 'register') {
-        const credential = await createUserWithEmailAndPassword(auth, email, password);
-        const displayName = registerName.trim() || email.split('@')[0];
-        await updateProfile(credential.user, { displayName });
-        completeTeacherLogin({ email, displayName, uid: credential.user.uid }, `အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`);
-      } else {
-        const credential = await signInWithEmailAndPassword(auth, email, password);
-        const displayName = credential.user.displayName || email.split('@')[0];
-        completeTeacherLogin({ email, displayName, uid: credential.user.uid }, `ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);
-      }
-    } catch (err) {
-      const messages = {
-        'auth/email-already-in-use': 'ဤ Gmail ဖြင့် အကောင့်ဖွင့်ပြီးသားပါ။ Login ဝင်ပါ။',
-        'auth/invalid-credential': 'Gmail သို့မဟုတ် Password မှားနေပါသည်။',
-        'auth/user-not-found': 'အကောင့်မတွေ့ပါ။ Register လုပ်ပါ။',
-        'auth/weak-password': 'Password အနည်းဆုံး ၆ လုံး လိုအပ်ပါသည်။',
-        'auth/invalid-email': 'Gmail လိပ်စာ မမှန်ပါ။',
-        'auth/network-request-failed': 'Internet ချိတ်ဆက်မှုကို စစ်ဆေးပါ။'
-      };
-      setAuthError(messages[err.code] || err.message || 'အကောင့်ဝင်ရာတွင် အခက်အခဲရှိပါသည်။');
-    } finally { setIsAuthLoading(false); }
+    try{let result;if(authMode==='register'){const displayName=registerName.trim()||email.split('@')[0];result=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName}}});}else result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(!result.data?.user)throw new Error('အကောင့်အတည်ပြုရန် Email ကို စစ်ဆေးပါ။');const user=result.data.user,displayName=user.user_metadata?.display_name||email.split('@')[0];completeTeacherLogin({email,displayName,uid:user.id},authMode==='register'?`အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`:`ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);}
+    catch(err){const messages={'User already registered':'ဤ Gmail ဖြင့် အကောင့်ဖွင့်ပြီးသားပါ။ Login ဝင်ပါ။','Invalid login credentials':'Gmail သို့မဟုတ် Password မှားနေပါသည်။','Email not confirmed':'Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပါ။'};setAuthError(messages[err.message]||err.message||'အကောင့်ဝင်ရာတွင် အခက်အခဲရှိပါသည်။');}finally{setIsAuthLoading(false);}
   };
+  const handleTeacherLogout=async()=>{try{if(supabase)await supabase.auth.signOut();}catch(err){console.warn('Sign out:',err);}setTeacherAccount(null);setFbUser(null);setLoginPassword('');setGeneratedQuizLink('');setGeneratedQuizCode('');notify('အကောင့်မှ ထွက်လိုက်ပါပြီ');};
 
-  const handleTeacherLogout = async () => {
-    try { if (auth) await signOut(auth); } catch (err) { console.warn('Sign out:', err); }
-    setTeacherAccount(null);
-    try {
-      window.localStorage.removeItem(LOCAL_KEYS.SESSION);
-    } catch {
-      // Ignore storage error
-    }
-    setLoginPassword('');
-    setGeneratedQuizLink('');
-    setGeneratedQuizCode('');
-    notify('အကောင့်မှ ထွက်လိုက်ပါပြီ');
-  };
-
-  // ==========================================================================
   // 5. AI PHOTO-TO-QUIZ HANDLERS
   // ==========================================================================
   const handleImageSelect = (e) => {
@@ -591,8 +463,8 @@ export default function App() {
       setAiError('မေးခွန်းဓာတ်ပုံ သို့မဟုတ် PDF ဖိုင် အရင်ရွေးချယ်ပေးပါ ဆရာ/ဆရာမ။');
       return;
     }
-    if (!auth?.currentUser) {
-      setAiError('AI မေးခွန်းထုတ်ရန် Firebase ဆရာ/ဆရာမ အကောင့်ဖြင့် ဝင်ထားရန် လိုအပ်ပါသည်။');
+    if (!fbUser || !supabase) {
+      setAiError('AI မေးခွန်းထုတ်ရန် ဆရာ/ဆရာမ အကောင့်ဖြင့် ဝင်ထားရန် လိုအပ်ပါသည်။');
       return;
     }
 
@@ -687,9 +559,7 @@ export default function App() {
       const local = readLocalMap(LOCAL_KEYS.QUIZZES);
       delete local[quiz.code];
       writeLocalMap(LOCAL_KEYS.QUIZZES, local);
-      if (fbUser && db) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', quiz.code));
-      }
+      if(fbUser&&supabase){const {error}=await supabase.from('quiz_assessments').delete().eq('code',quiz.code).eq('teacher_id',fbUser.id);if(error)throw error;}
       setMyQuizzes(Object.values(local));
       if (editingQuizCode === quiz.code) setEditingQuizCode('');
       notify('မေးခွန်းလွှာကို ဖျက်ပြီးပါပြီ');
@@ -740,24 +610,12 @@ export default function App() {
         createdAtMs: Date.now()
       };
 
-      // Save locally first so Quiz Code ALWAYS works immediately
-      const localQuizzes = readLocalMap(LOCAL_KEYS.QUIZZES);
-      localQuizzes[code] = quizDoc;
-      writeLocalMap(LOCAL_KEYS.QUIZZES, localQuizzes);
-      setMyQuizzes(
-        Object.values(localQuizzes).sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0))
-      );
-
-      // Best-effort sync to Firestore
-      if (fbUser && db) {
-        try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', code), quizDoc);
-        } catch (cloudErr) {
-          console.warn('Cloud quiz save fallback to local:', cloudErr);
-        }
-      }
-
-      if (!db) notify('Quiz ကို ဒီ Browser ထဲမှာသာ သိမ်းထားပါတယ်။ အခြားစက်များသို့ မျှဝေရန် Firebase Setup လိုအပ်ပါသည်။');
+      if(!supabase||!fbUser)throw new Error('Supabase အကောင့်ကို ပြန်ဝင်ပါ။');
+      const studentData={...quizDoc,questions:quizDoc.questions.map(({correctOption,...q})=>q)};
+      const {error:saveError}=await supabase.from('quiz_assessments').upsert({code,teacher_id:fbUser.id,teacher_email:fbUser.email,quiz_data:quizDoc,student_data:studentData,is_published:true},{onConflict:'code'});
+      if(saveError)throw saveError;
+      const localQuizzes=readLocalMap(LOCAL_KEYS.QUIZZES);localQuizzes[code]=quizDoc;writeLocalMap(LOCAL_KEYS.QUIZZES,localQuizzes);
+      setMyQuizzes(Object.values(localQuizzes).sort((x,y)=>(y.createdAtMs||0)-(x.createdAtMs||0)));
       const shortUrl = buildCleanShortUrl('q', code);
       setGeneratedQuizCode(code);
       setGeneratedQuizLink(shortUrl);
@@ -797,21 +655,9 @@ export default function App() {
 
     setIsLoadingQuizCode(true);
     try {
-      const localQuizzes = readLocalMap(LOCAL_KEYS.QUIZZES);
-      let foundQuiz = localQuizzes[code] || null;
-
-      if (!foundQuiz && db) {
-        try {
-          const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', code));
-          if (snap.exists()) {
-            foundQuiz = snap.data();
-            localQuizzes[code] = foundQuiz;
-            writeLocalMap(LOCAL_KEYS.QUIZZES, localQuizzes);
-          }
-        } catch (cloudErr) {
-          console.warn('Cloud quiz fetch fallback:', cloudErr);
-        }
-      }
+      let foundQuiz=null;
+      if(supabase){const {data,error}=await supabase.from('published_quizzes').select('student_data').eq('code',code).maybeSingle();if(error)throw error;foundQuiz=data?.student_data||null;}
+      if(!foundQuiz){const localQuizzes=readLocalMap(LOCAL_KEYS.QUIZZES);foundQuiz=localQuizzes[code]||null;}
 
       if (foundQuiz) {
         setActiveQuiz(foundQuiz);
@@ -1029,26 +875,7 @@ export default function App() {
         );
       }
 
-      if (fbUser && db) {
-        try {
-          const subRef = doc(
-            db,
-            'artifacts',
-            appId,
-            'public',
-            'data',
-            'submissions',
-            selectedSubmission.code
-          );
-          await updateDoc(subRef, {
-            status: 'Graded',
-            earnedMarks: liveTotalScore,
-            grades: gradingMarks
-          });
-        } catch (cloudErr) {
-          console.warn('Cloud grade update fallback:', cloudErr);
-        }
-      }
+      if(fbUser&&supabase){const current=localSubs[selectedSubmission.code]||selectedSubmission;const {error}=await supabase.from('quiz_submissions').update({status:'Graded',submission_data:{...current,status:'Graded',earnedMarks:liveTotalScore,grades:gradingMarks}}).eq('code',selectedSubmission.code).eq('teacher_id',fbUser.id);if(error)throw error;}
 
       notify(
         `${selectedSubmission.studentName} ၏ ရမှတ် (${liveTotalScore}/${selectedSubmission.totalMarks}) သိမ်းပြီးပါပြီ ✓`
@@ -1067,23 +894,11 @@ export default function App() {
     if (!code) return;
 
     try {
-      const localSubs = readLocalMap(LOCAL_KEYS.SUBMISSIONS);
-      let foundSub = localSubs[code] || null;
-
-      if (!foundSub && fbUser && db) {
-        try {
-          const snap = await getDoc(
-            doc(db, 'artifacts', appId, 'public', 'data', 'submissions', code)
-          );
-          if (snap.exists()) {
-            foundSub = snap.data();
-            localSubs[code] = foundSub;
-            writeLocalMap(LOCAL_KEYS.SUBMISSIONS, localSubs);
-          }
-        } catch (cloudErr) {
-          console.warn('Cloud submission lookup fallback:', cloudErr);
-        }
-      }
+      let foundSub=null;
+      if(supabase&&fbUser){
+        const {data,error}=await supabase.from('quiz_submissions').select('submission_data').eq('code',code).eq('teacher_id',fbUser.id).maybeSingle();if(error)throw error;foundSub=data?.submission_data||null;
+        if(foundSub?.quizCode){const {data:quizRow,error:quizError}=await supabase.from('quiz_assessments').select('quiz_data').eq('code',foundSub.quizCode).eq('teacher_id',fbUser.id).maybeSingle();if(quizError)throw quizError;const answerMap=new Map((quizRow?.quiz_data?.questions||[]).map(q=>[q.id,q.correctOption]));foundSub={...foundSub,questions:(foundSub.questions||[]).map(q=>({...q,correctOption:answerMap.has(q.id)?answerMap.get(q.id):null}))};}
+      }else{const localSubs=readLocalMap(LOCAL_KEYS.SUBMISSIONS);foundSub=localSubs[code]||null;}
 
       if (!foundSub) {
         setPasteResultError(`Submission Code "${code}" ရှာမတွေ့ပါ။`);
@@ -1255,9 +1070,9 @@ export default function App() {
                 </div>
               </div>
 
-              {!hasFirebaseConfig && (
+              {!hasSupabaseConfig && (
                 <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[11px] text-amber-900">
-                  Firebase Project မချိတ်ရသေးပါ။ Student demo ကိုသာ စမ်းနိုင်ပြီး Teacher account / Cloud sync အတွက် Setup လိုအပ်ပါသည်။
+                  Supabase မချိတ်ရသေးပါ။ Student demo ကိုသာ စမ်းနိုင်ပြီး Teacher account / Cloud sync အတွက် Setup လိုအပ်ပါသည်။
                 </div>
               )}
 
