@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import SubscriptionCenter from './SubscriptionCenter.jsx';
+import TeachingHub from './TeachingHub.jsx';
 import {
   Camera,
   Sparkles,
@@ -210,7 +211,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   // Navigation & Global UI Feedback
-  const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription'
+  const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription' | 'teaching'
   const adminLogoTapRef = useRef({ count: 0, at: 0 });
   const [toast, setToast] = useState('');
   const [copiedId, setCopiedId] = useState('');
@@ -1030,7 +1031,7 @@ export default function App() {
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
-          {activeTab === 'subscription' && teacherAccount ? (
+          {activeTab === 'teaching' && teacherAccount ? (\n            <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />\n          ) : activeTab === 'subscription' && teacherAccount ? (
             <SubscriptionCenter supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
           ) : showTeacherAuthGate ? (
             <div className="pt-1 space-y-4">
@@ -2281,7 +2282,7 @@ export default function App() {
             BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
            ================================================================== */}
         <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-[396px]">
-          <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-4 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
+          <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-5 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
             <button
               type="button"
               onClick={() => setActiveTab('creator')}
@@ -2306,6 +2307,19 @@ export default function App() {
             >
               <FileText className="w-4 h-4" />
               <span className="text-[10px] font-bold">ကျောင်းသားဖြေ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('teaching')}
+              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+                activeTab === 'teaching'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span className="text-sm">📚</span>
+              <span className="text-[10px] font-bold">Teaching</span>
             </button>
 
             <button
