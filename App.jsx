@@ -711,6 +711,7 @@ export default function App() {
             (q.options.length < 2 ||
               q.options.length > 4 ||
               q.options.some((o) => !String(o).trim()) ||
+              (q.correctOption === null || q.correctOption === undefined) ||
               !Number.isInteger(Number(q.correctOption)) ||
               Number(q.correctOption) < 0 ||
               Number(q.correctOption) >= q.options.length))
