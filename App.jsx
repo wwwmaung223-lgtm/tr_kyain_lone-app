@@ -44,6 +44,13 @@ import {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey);
+
+const getTeacherDeviceId = () => {
+  const key = 'tr_kyain_lone_device_id';
+  let id = window.localStorage.getItem(key);
+  if (!id) { id = window.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`; window.localStorage.setItem(key, id); }
+  return id;
+};
 const supabase = hasSupabaseConfig ? createClient(supabaseUrl, supabasePublishableKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 }) : null;
@@ -202,6 +209,7 @@ export default function App() {
   // Supabase Auth User
   const [fbUser, setFbUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const deviceClaimRef = useRef('');
 
   // Teacher Account Session State (Gmail + Custom Password)
   const [teacherAccount, setTeacherAccount] = useState(null);
@@ -352,6 +360,38 @@ export default function App() {
     const {data:authListener}=supabase.auth.onAuthStateChange((_event,session)=>{const user=session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);});
     return()=>authListener.subscription.unsubscribe();
   },[]);
+
+  // 1b. Enforce one active teacher device through the database session registry.
+  useEffect(() => {
+    if (!authReady || !fbUser?.id || !supabase || deviceClaimRef.current === fbUser.id) return;
+    deviceClaimRef.current = fbUser.id;
+    const deviceId = getTeacherDeviceId();
+    const claim = async () => {
+      try {
+        const args = { p_device_id: deviceId, p_device_label: /mobile/i.test(navigator.userAgent) ? 'Mobile device' : 'Desktop browser', p_replace: false };
+        const { data, error } = await supabase.rpc('claim_teacher_device', args);
+        if (error) throw error;
+        if (data?.conflict) {
+          const replace = window.confirm('ဒီအကောင့်ကို အခြားစက်တစ်လုံးတွင် အသုံးပြုနေပါသည်။ အခြားစက်၏ session ကို ပိတ်ပြီး ဒီစက်တွင် ဆက်ဝင်မလား?');
+          if (!replace) {
+            deviceClaimRef.current = '';
+            await supabase.auth.signOut();
+            notify('အခြားစက်တွင် လက်ရှိ session ကို ဆက်လက်အသုံးပြုနေပါသည်။');
+            return;
+          }
+          const { data: replaced, error: replaceError } = await supabase.rpc('claim_teacher_device', { ...args, p_replace: true });
+          if (replaceError || !replaced?.success) throw replaceError || new Error('ဒီစက်ကို active device အဖြစ် သတ်မှတ်မရပါ။');
+          notify('ဒီစက်ကို active device အဖြစ် ပြောင်းပြီးပါပြီ။');
+        } else if (!data?.success) throw new Error('Device session ကို အတည်မပြုနိုင်ပါ။');
+      } catch (err) {
+        deviceClaimRef.current = '';
+        console.error('Device session check failed:', err);
+        notify('Device security ကို အတည်မပြုနိုင်ပါ။ Database migration အသင့်ဖြစ်ပြီးမှ ပြန်ဝင်ပါ။');
+        await supabase.auth.signOut();
+      }
+    };
+    claim();
+  }, [authReady, fbUser?.id, supabase]);
 
   // 2. DETECT HASH / URL PARAMETERS (#q=XXXXXX or #s=XXXXXX) ON LOAD & HASHCHANGE
   // ==========================================================================
