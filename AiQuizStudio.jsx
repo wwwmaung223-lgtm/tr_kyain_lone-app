@@ -30,7 +30,6 @@ export default function AiQuizStudio({
   ].filter(Boolean).join('\n');
 
   const handleGenerate = () => {
-    setAiPromptNote(prompt);
     handleRunGeminiPhotoToQuiz(prompt);
   };
 
