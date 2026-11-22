@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import SubscriptionCenter from './SubscriptionCenter.jsx';
-import TeachingHub from './TeachingHub.jsx';
-import AiQuizStudio from './AiQuizStudio.jsx';
+const SubscriptionCenter = React.lazy(() => import('./SubscriptionCenter.jsx'));
+const TeachingHub = React.lazy(() => import('./TeachingHub.jsx'));
+const AiQuizStudio = React.lazy(() => import('./AiQuizStudio.jsx'));
 import {
   Camera,
   Sparkles,
@@ -1033,9 +1033,13 @@ export default function App() {
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
           {activeTab === 'teaching' && teacherAccount ? (
-            <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+            <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading Teaching Hub…</div>}>
+              <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+            </React.Suspense>
           ) : activeTab === 'subscription' && teacherAccount ? (
-            <SubscriptionCenter supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+            <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading subscription…</div>}>
+              <SubscriptionCenter supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+            </React.Suspense>
           ) : showTeacherAuthGate ? (
             <div className="pt-1 space-y-4">
               {/* Student Quick Access Card */}
@@ -1325,6 +1329,7 @@ export default function App() {
                   </div>
 
                   {/* 2. Figma-aligned AI Quiz Studio — upload, settings and live question preview */}
+                  <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading AI Studio…</div>}>
                   <AiQuizStudio
                     fileInputRef={fileInputRef}
                     uploadedPreview={uploadedPreview}
@@ -1359,7 +1364,7 @@ export default function App() {
                       setWorksheetImage('');
                     }}
                   />
-
+                  </React.Suspense>
 
                   {/* 4. Editable Questions List (အဖြေမှန် ရွေးချယ်သတ်မှတ်ရန်) */}
                   <div className="space-y-3">
