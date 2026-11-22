@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const SubscriptionCenter = React.lazy(() => import('./SubscriptionCenter.jsx'));
 const TeachingHub = React.lazy(() => import('./TeachingHub.jsx'));
 const AiQuizStudio = React.lazy(() => import('./AiQuizStudio.jsx'));
+const TeacherAIWorkspace = React.lazy(() => import('./TeacherAIWorkspace.jsx'));
 import {
   Camera,
   Sparkles,
@@ -1032,7 +1033,11 @@ export default function App() {
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
-          {activeTab === 'teaching' && teacherAccount ? (
+          {activeTab === 'ai' && teacherAccount ? (
+            <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading AI Agents…</div>}>
+              <TeacherAIWorkspace supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+            </React.Suspense>
+          ) : activeTab === 'teaching' && teacherAccount ? (
             <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading Teaching Hub…</div>}>
               <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
             </React.Suspense>
@@ -2211,6 +2216,15 @@ export default function App() {
             >
               <FileText className="w-4 h-4" />
               <span className="text-[10px] font-bold">ကျောင်းသားဖြေ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('ai')}
+              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${activeTab === 'ai' ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              <span className="text-sm">✨</span>
+              <span className="text-[10px] font-bold">AI Agents</span>
             </button>
 
             <button
