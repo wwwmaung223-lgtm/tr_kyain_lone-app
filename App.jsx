@@ -1360,8 +1360,6 @@ export default function App() {
                     }}
                   />
 
-                  />
-                  </div>
 
                   {/* 4. Editable Questions List (အဖြေမှန် ရွေးချယ်သတ်မှတ်ရန်) */}
                   <div className="space-y-3">
