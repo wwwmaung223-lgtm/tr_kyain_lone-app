@@ -61,6 +61,11 @@ The project is linked to the GitHub repository `wwwmaung223-lgtm/tr_kyain_lone-a
 - Test mobile and desktop layouts, network errors, empty states and slow loading.
 - Confirm Vercel Production is publicly reachable for students; preview deployments may remain protected by SSO.
 
+## Latest database additions
+
+- `20261122074501_gate_class_students_subscription.sql` — applies the subscription access gate to teacher class rosters.
+- `20261122074634_add_teaching_platform_foreign_key_indexes.sql` — adds indexes for teacher, lesson, homework and payment foreign keys.
+
 ## Important limitations
 
 - KPay approval is a manual verification workflow; it is not an automated payment gateway.
