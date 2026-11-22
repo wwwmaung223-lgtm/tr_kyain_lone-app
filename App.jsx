@@ -1321,7 +1321,10 @@ export default function App() {
                       className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-xs shadow-lg shadow-indigo-300/50 active:scale-[0.98] transition"
                     >
                       အောက်မှာ ဖြေရမယ့် Answer Sheet ထုတ်မည်
-                    </butto{/* 2. Figma-aligned AI Quiz Studio — upload, settings and live question preview */}
+                    </button>
+                  </div>
+
+                  {/* 2. Figma-aligned AI Quiz Studio — upload, settings and live question preview */}
                   <AiQuizStudio
                     fileInputRef={fileInputRef}
                     uploadedPreview={uploadedPreview}
