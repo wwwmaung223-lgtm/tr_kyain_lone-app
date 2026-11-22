@@ -152,7 +152,7 @@ const generateQuizFromApi = async (base64Data, mimeType, customInstruction, onSt
   const response = await fetch('/api/generate-quiz', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64Data, mimeType, customInstruction, accessToken })
+    body: JSON.stringify({ base64Data, mimeType, customInstruction, accessToken, deviceId: getTeacherDeviceId() })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
