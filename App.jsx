@@ -1031,7 +1031,9 @@ export default function App() {
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
-          {activeTab === 'teaching' && teacherAccount ? (\n            <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />\n          ) : activeTab === 'subscription' && teacherAccount ? (
+          {activeTab === 'teaching' && teacherAccount ? (
+            <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+          ) : activeTab === 'subscription' && teacherAccount ? (
             <SubscriptionCenter supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
           ) : showTeacherAuthGate ? (
             <div className="pt-1 space-y-4">
