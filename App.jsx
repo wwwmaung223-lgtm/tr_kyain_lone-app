@@ -950,7 +950,7 @@ export default function App() {
   // RENDER MOBILE-FIRST iOS 26 VIEWPORT
   // ==========================================================================
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#eef4ff] via-[#f7f5ff] to-[#ebf8ff] text-slate-800 flex justify-center selection:bg-indigo-200">
+    <div className="liquid-morph-shell min-h-screen w-full bg-gradient-to-br from-[#eef4ff] via-[#f7f5ff] to-[#ebf8ff] text-slate-800 flex justify-center selection:bg-indigo-200">
       <style>{`
         .ios-glass {
           background: rgba(255, 255, 255, 0.74);

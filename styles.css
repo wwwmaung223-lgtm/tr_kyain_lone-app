@@ -7,3 +7,213 @@
 .ios-glass,.ios-glass-strong{transition:box-shadow .22s ease,border-color .22s ease}.ios-glass:hover{border-color:rgba(165,180,252,.72);box-shadow:0 16px 38px -16px rgba(49,46,129,.2),inset 0 1px 0 #fff}.ios-glass-strong{box-shadow:0 22px 55px -24px rgba(49,46,129,.22),inset 0 1px 0 #fff}.ios-glass-strong:focus-within{border-color:rgba(129,140,248,.7)}
 button{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}button:active{transform:scale(.985)}button:disabled{cursor:not-allowed}input,textarea{max-width:100%}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+
+/* ================================================================
+   LIQUID MORPHS — Tr.Kyain Lone visual system
+   Soft morphing light forms sit behind a clear, high-contrast UI.
+   ================================================================ */
+:root {
+  --liquid-ink: #1d2440;
+  --liquid-indigo: #5d68e9;
+  --liquid-violet: #8f70ed;
+  --liquid-cyan: #6cc9ef;
+  --liquid-border: rgba(255,255,255,.74);
+  --liquid-shadow: 0 22px 60px -28px rgba(49,57,126,.27);
+}
+.liquid-morph-shell {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  background:
+    radial-gradient(ellipse at 12% 7%, rgba(107,133,255,.19), transparent 34%),
+    radial-gradient(ellipse at 91% 15%, rgba(185,137,255,.19), transparent 31%),
+    radial-gradient(ellipse at 72% 91%, rgba(101,207,238,.15), transparent 36%),
+    linear-gradient(130deg,#eef4ff 0%,#f8f5ff 48%,#eaf7ff 100%) !important;
+}
+.liquid-morph-shell::before,
+.liquid-morph-shell::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  width: clamp(260px, 42vw, 660px);
+  aspect-ratio: 1;
+  border-radius: 44% 56% 62% 38% / 42% 40% 60% 58%;
+  filter: blur(22px);
+  opacity: .54;
+  transform: translate3d(0,0,0);
+  will-change: border-radius, transform;
+}
+.liquid-morph-shell::before {
+  top: -18%;
+  left: -15%;
+  background:
+    radial-gradient(circle at 36% 34%, rgba(255,255,255,.94) 0 5%, transparent 34%),
+    radial-gradient(ellipse at 42% 46%, rgba(104,130,255,.58), transparent 62%),
+    radial-gradient(ellipse at 68% 64%, rgba(171,133,255,.48), transparent 60%);
+  animation: liquidMorphOne 24s ease-in-out infinite alternate;
+}
+.liquid-morph-shell::after {
+  right: -18%;
+  bottom: -22%;
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255,255,255,.9) 0 4%, transparent 32%),
+    radial-gradient(ellipse at 45% 50%, rgba(99,195,237,.48), transparent 62%),
+    radial-gradient(ellipse at 68% 62%, rgba(157,131,247,.42), transparent 62%);
+  animation: liquidMorphTwo 29s ease-in-out infinite alternate;
+}
+.liquid-morph-shell > .relative {
+  position: relative;
+  z-index: 1;
+}
+@keyframes liquidMorphOne {
+  0% { border-radius: 44% 56% 62% 38% / 42% 40% 60% 58%; transform: translate3d(0,0,0) rotate(0deg) scale(1); }
+  50% { border-radius: 62% 38% 43% 57% / 55% 62% 38% 45%; transform: translate3d(7vw,5vh,0) rotate(25deg) scale(1.08); }
+  100% { border-radius: 38% 62% 58% 42% / 62% 38% 62% 38%; transform: translate3d(12vw,9vh,0) rotate(48deg) scale(.94); }
+}
+@keyframes liquidMorphTwo {
+  0% { border-radius: 58% 42% 36% 64% / 48% 58% 42% 52%; transform: translate3d(0,0,0) rotate(0deg) scale(1); }
+  55% { border-radius: 39% 61% 59% 41% / 58% 42% 58% 42%; transform: translate3d(-8vw,-5vh,0) rotate(-24deg) scale(1.1); }
+  100% { border-radius: 62% 38% 46% 54% / 38% 60% 40% 62%; transform: translate3d(-12vw,-9vh,0) rotate(-42deg) scale(.95); }
+}
+.liquid-morph-shell .ios-glass,
+.liquid-morph-shell .ios-glass-strong {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.76);
+  background: linear-gradient(145deg,rgba(255,255,255,.78),rgba(246,248,255,.53)) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  backdrop-filter: blur(24px) saturate(175%);
+  box-shadow: 0 18px 48px -27px rgba(56,64,139,.34), inset 0 1px 0 rgba(255,255,255,.96), inset 0 -1px 0 rgba(135,149,218,.10);
+}
+.liquid-morph-shell .ios-glass-strong {
+  background: linear-gradient(145deg,rgba(255,255,255,.9),rgba(241,245,255,.68)) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(185%);
+  backdrop-filter: blur(30px) saturate(185%);
+  box-shadow: 0 24px 58px -30px rgba(50,60,140,.38), inset 0 1.5px 0 rgba(255,255,255,1), inset 0 -1px 0 rgba(139,151,214,.14);
+}
+.liquid-morph-shell .ios-glass::before,
+.liquid-morph-shell .ios-glass-strong::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(125deg,rgba(255,255,255,.44),transparent 28%,transparent 70%,rgba(194,203,255,.12));
+  opacity: .8;
+}
+.liquid-morph-shell .ios-glass:hover,
+.liquid-morph-shell .ios-glass-strong:hover {
+  border-color: rgba(173,187,255,.84);
+  box-shadow: 0 23px 56px -28px rgba(62,70,153,.38),inset 0 1px 0 #fff;
+}
+.liquid-studio {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.8) !important;
+  background:
+    radial-gradient(ellipse at 92% 8%,rgba(163,142,255,.18),transparent 32%),
+    radial-gradient(ellipse at 4% 95%,rgba(107,197,244,.16),transparent 34%),
+    linear-gradient(145deg,rgba(255,255,255,.91),rgba(245,247,255,.75)) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  backdrop-filter: blur(24px) saturate(175%);
+  box-shadow: 0 28px 70px -36px rgba(70,75,156,.36),inset 0 1px 0 rgba(255,255,255,.98);
+}
+.liquid-studio::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 260px;
+  height: 220px;
+  top: -115px;
+  right: -75px;
+  border-radius: 46% 54% 61% 39%;
+  background: radial-gradient(ellipse at 35% 35%,rgba(255,255,255,.9),rgba(148,130,250,.22) 45%,rgba(105,188,245,.05) 72%,transparent 75%);
+  filter: blur(2px);
+  pointer-events: none;
+  animation: liquidMorphOne 20s ease-in-out infinite alternate;
+}
+.liquid-panel {
+  position: relative;
+  border: 1px solid rgba(255,255,255,.85) !important;
+  background: linear-gradient(145deg,rgba(255,255,255,.82),rgba(247,248,255,.58)) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: 0 18px 42px -28px rgba(64,72,148,.34),inset 0 1px 0 rgba(255,255,255,.96);
+}
+.liquid-dropzone {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(131,116,231,.48) !important;
+  background:
+    radial-gradient(ellipse at 14% 30%,rgba(255,255,255,.95),transparent 44%),
+    linear-gradient(115deg,rgba(239,237,255,.9),rgba(229,243,255,.7)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95),0 12px 28px -22px rgba(90,93,196,.36);
+  transition: transform .25s ease,box-shadow .25s ease,border-color .25s ease;
+}
+.liquid-dropzone:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96,101,223,.78) !important;
+  box-shadow: inset 0 1px 0 #fff,0 20px 34px -24px rgba(91,98,212,.48);
+}
+.liquid-dropzone > span:first-of-type {
+  background: linear-gradient(145deg,#eef0ff,#ddf3ff) !important;
+  box-shadow: inset 0 1px 0 #fff,0 8px 18px -12px rgba(86,93,205,.42);
+}
+.liquid-cta {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.48);
+  background: linear-gradient(105deg,#5367eb 0%,#8069ed 52%,#4eabe7 100%) !important;
+  box-shadow: 0 18px 34px -18px rgba(74,83,206,.6),inset 0 1px 0 rgba(255,255,255,.36);
+  transition: transform .22s ease,box-shadow .22s ease,filter .22s ease;
+}
+.liquid-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg,rgba(255,255,255,.28),transparent 32%,transparent 65%,rgba(255,255,255,.13));
+  opacity: .8;
+}
+.liquid-cta:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 23px 38px -18px rgba(74,83,206,.68),inset 0 1px 0 rgba(255,255,255,.44);
+}
+.liquid-cta:active:not(:disabled) { transform: translateY(0) scale(.99); }
+.liquid-cta:disabled { filter: saturate(.72); }
+.liquid-morph-shell input:not([type="checkbox"]):not([type="radio"]),
+.liquid-morph-shell textarea,
+.liquid-morph-shell select {
+  border-color: rgba(171,178,212,.48);
+  box-shadow: inset 0 1px 2px rgba(41,50,105,.035);
+}
+.liquid-morph-shell input:focus,
+.liquid-morph-shell textarea:focus,
+.liquid-morph-shell select:focus {
+  border-color: rgba(99,105,229,.8) !important;
+  box-shadow: 0 0 0 3px rgba(102,111,232,.13);
+}
+@media (max-width: 640px) {
+  .liquid-morph-shell::before,.liquid-morph-shell::after {
+    width: 68vw;
+    filter: blur(26px);
+    opacity: .34;
+  }
+  .liquid-morph-shell::before { top: -8%; left: -28%; }
+  .liquid-morph-shell::after { right: -32%; bottom: -9%; }
+  .liquid-studio { border-radius: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-morph-shell::before,.liquid-morph-shell::after,.liquid-studio::before { animation: none !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-morph-shell .ios-glass,.liquid-morph-shell .ios-glass-strong,.liquid-panel {
+    background: rgba(255,255,255,.98) !important;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

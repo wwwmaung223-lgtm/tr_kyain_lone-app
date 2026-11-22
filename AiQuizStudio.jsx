@@ -37,7 +37,7 @@ export default function AiQuizStudio({
   const label = 'mb-1.5 block text-[11px] font-bold text-[#535779]';
 
   return (
-    <section className="rounded-[26px] border border-white bg-gradient-to-br from-white via-[#fbfaff] to-[#f4f5ff] p-4 shadow-[0_18px_44px_rgba(86,77,180,.10)] sm:p-5">
+    <section className="liquid-studio rounded-[26px] border border-white bg-gradient-to-br from-white via-[#fbfaff] to-[#f4f5ff] p-4 shadow-[0_18px_44px_rgba(86,77,180,.10)] sm:p-5">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="mb-1 text-[10px] font-extrabold tracking-[.16em] text-[#8068dc]">TEACHER WORKSPACE / AI STUDIO</p>
@@ -48,9 +48,9 @@ export default function AiQuizStudio({
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(300px,.94fr)]">
-        <div className="space-y-4 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
+        <div className="liquid-panel space-y-4 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
           <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" onChange={handleImageSelect} className="hidden"/>
-          <button type="button" onClick={()=>fileInputRef.current?.click()} className="group flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#b9a9f2] bg-gradient-to-r from-[#faf7ff] to-[#f3f5ff] p-4 text-left transition hover:border-[#8068dc] hover:shadow-sm">
+          <button type="button" onClick={()=>fileInputRef.current?.click()} className="liquid-dropzone group flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#b9a9f2] bg-gradient-to-r from-[#faf7ff] to-[#f3f5ff] p-4 text-left transition hover:border-[#8068dc] hover:shadow-sm">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#eeeaff] text-[#715cda]"><UploadCloud className="h-6 w-6"/></span>
             <span className="min-w-0 flex-1">
               <b className="block truncate text-xs font-extrabold text-[#34365d]">{uploadedFileName || 'Upload worksheet, textbook or photo'}</b>
@@ -88,11 +88,11 @@ export default function AiQuizStudio({
 
           {aiError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[11px] font-semibold text-rose-700">{aiError}</p>}
           {isAiGenerating && <p role="status" className="rounded-xl bg-[#f0edff] px-3 py-2.5 text-[11px] font-semibold text-[#6555c4]">{aiStatus || 'AI is preparing your quiz…'}</p>}
-          <button type="button" onClick={handleGenerate} disabled={isAiGenerating || !uploadedBase64} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#8065e8] to-[#5861df] px-4 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-indigo-200/70 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Sparkles className="h-4 w-4"/>{isAiGenerating ? 'Generating quiz…' : 'Generate quiz'}<span className="ml-auto">→</span></button>
+          <button type="button" onClick={handleGenerate} disabled={isAiGenerating || !uploadedBase64} className="liquid-cta flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#8065e8] to-[#5861df] px-4 py-3.5 text-xs font-extrabold text-white shadow-lg shadow-indigo-200/70 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"><Sparkles className="h-4 w-4"/>{isAiGenerating ? 'Generating quiz…' : 'Generate quiz'}<span className="ml-auto">→</span></button>
           <p className="text-[10px] leading-4 text-[#9699ae]">AI-generated questions should be reviewed by the teacher before publishing.</p>
         </div>
 
-        <aside className="space-y-3 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
+        <aside className="liquid-panel space-y-3 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-[9px] font-extrabold tracking-[.15em] text-[#8068dc]">LIVE PREVIEW</p><h3 className="mt-1 text-[15px] font-extrabold text-[#292b50]">{quizTitle || 'Untitled quiz'}</h3><p className="mt-1 text-[10px] text-[#8589a2]">{subject} · {grade} · {difficulty}</p></div>
             <span className="rounded-xl bg-[#efedff] px-2.5 py-2 text-[10px] font-extrabold text-[#6855d2]">{questions.length} Q</span>
