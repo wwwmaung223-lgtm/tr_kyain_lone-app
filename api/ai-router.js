@@ -93,7 +93,7 @@ async function callOpenAI(prompt, key) {
 async function callAnthropic(prompt, key) {
   const response = await request('https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-3-5-haiku-latest', max_tokens: 4096, messages: [{ role: 'user', content: prompt + '\nReturn only a valid JSON object.' }] })
+    body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt + '\nReturn only a valid JSON object.' }] })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(data.error?.message || `Anthropic HTTP ${response.status}`), { status: response.status });
