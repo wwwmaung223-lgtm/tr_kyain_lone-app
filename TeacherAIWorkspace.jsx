@@ -46,6 +46,7 @@ export default function TeacherAIWorkspace({ supabase, user, onClose }) {
         body: JSON.stringify({
           task: agent, provider: provider === 'auto' ? undefined : provider,
           accessToken: sessionData.session.access_token,
+          deviceId: window.localStorage.getItem('tr_kyain_lone_device_id') || '',
           input: { language, request: input.trim() }
         })
       });
