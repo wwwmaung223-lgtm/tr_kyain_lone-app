@@ -393,6 +393,22 @@ export default function App() {
     claim();
   }, [authReady, fbUser?.id, supabase]);
 
+  // Keep the active device lease fresh; a replaced device is signed out on its next heartbeat.
+  useEffect(() => {
+    if (!authReady || !fbUser?.id || !supabase) return;
+    const deviceId = getTeacherDeviceId();
+    const heartbeat = async () => {
+      const { data, error } = await supabase.rpc('touch_teacher_device', { p_device_id: deviceId });
+      if (error || data !== true) {
+        deviceClaimRef.current = '';
+        await supabase.auth.signOut();
+        notify('ဤအကောင့်၏ active device ကို အခြားစက်သို့ ပြောင်းထားပါသည်။');
+      }
+    };
+    const timer = window.setInterval(heartbeat, 30000);
+    return () => window.clearInterval(timer);
+  }, [authReady, fbUser?.id, supabase]);
+
   // 2. DETECT HASH / URL PARAMETERS (#q=XXXXXX or #s=XXXXXX) ON LOAD & HASHCHANGE
   // ==========================================================================
   useEffect(() => {
