@@ -14,6 +14,7 @@ export default function TeacherAIWorkspace({ supabase, user, onClose }) {
   const [provider, setProvider] = useState('auto');
   const [language, setLanguage] = useState('my-en');
   const [input, setInput] = useState('');
+  const [sourceFile, setSourceFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
@@ -41,18 +42,39 @@ export default function TeacherAIWorkspace({ supabase, user, onClose }) {
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData?.session?.access_token) throw new Error('Session သက်တမ်းကုန်နေပါပြီ။ ပြန်ဝင်ပါ။');
-      const response = await fetch('/api/ai-router', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          task: agent, provider: provider === 'auto' ? undefined : provider,
-          accessToken: sessionData.session.access_token,
-          deviceId: window.localStorage.getItem('tr_kyain_lone_device_id') || '',
-          input: { language, request: input.trim() }
-        })
-      });
+      let response;
+      if (agent === 'question' && sourceFile) {
+        if (sourceFile.size > 3 * 1024 * 1024) throw new Error('ဓာတ်ပုံ/PDF ဖိုင်ကို 3MB အောက်ထားပါ။');
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+          reader.onerror = () => reject(new Error('ဖိုင်ကို ဖတ်မရပါ။'));
+          reader.readAsDataURL(sourceFile);
+        });
+        response = await fetch('/api/generate-quiz', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64Data, mimeType: sourceFile.type, customInstruction: input.trim(),
+            accessToken: sessionData.session.access_token,
+            deviceId: window.localStorage.getItem('tr_kyain_lone_device_id') || ''
+          })
+        });
+      } else {
+        response = await fetch('/api/ai-router', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task: agent, provider: provider === 'auto' ? undefined : provider,
+            accessToken: sessionData.session.access_token,
+            deviceId: window.localStorage.getItem('tr_kyain_lone_device_id') || '',
+            input: { language, request: input.trim() }
+          })
+        });
+      }
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) throw new Error(data.error || 'AI request မအောင်မြင်ပါ။');
-      setResult(data);
+      setResult(agent === 'question' && sourceFile
+        ? { provider: 'Gemini OCR', result: { title: data.title, description: data.description, questions: data.questions }, requiresTeacherReview: true }
+        : data);
     } catch (err) { setError(err.message || 'တစ်ခုခုမှားယွင်းနေပါသည်။'); }
     finally { setBusy(false); }
   };
@@ -86,8 +108,9 @@ export default function TeacherAIWorkspace({ supabase, user, onClose }) {
         <label className="text-[11px] font-bold text-slate-600">AI Provider<select value={provider} onChange={e=>setProvider(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs"><option value="auto">Smart Auto (Free first)</option><option value="gemini">Gemini</option><option value="openai">OpenAI</option><option value="anthropic">Claude</option></select></label>
         <label className="text-[11px] font-bold text-slate-600">Language<select value={language} onChange={e=>setLanguage(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-xs"><option value="my-en">မြန်မာ + English</option><option value="my">မြန်မာ</option><option value="en">English</option></select></label>
       </div>
-      <textarea value={input} onChange={e=>setInput(e.target.value)} required rows={7} maxLength={12000} placeholder="သင့်တောင်းဆိုချက်နှင့် အချက်အလက်များကို ဒီမှာထည့်ပါ..." className="w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"/>
-      <button disabled={busy || !input.trim()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-extrabold text-white disabled:opacity-50">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{busy?'AI လုပ်ဆောင်နေသည်...':'AI Agent ကို စတင်မည်'}</button>
+      {agent === 'question' && <label className="block rounded-2xl border border-dashed border-indigo-300 bg-indigo-50/60 p-3 text-xs font-bold text-indigo-800">Photo / PDF OCR (3MB အောက်)<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setSourceFile(e.target.files?.[0]||null)} className="mt-2 block w-full text-xs text-slate-700"/>{sourceFile && <span className="mt-1 block font-medium text-slate-500">{sourceFile.name}</span>}</label>}
+      <textarea value={input} onChange={e=>setInput(e.target.value)} required={!sourceFile} rows={7} maxLength={12000} placeholder="သင့်တောင်းဆိုချက်နှင့် အချက်အလက်များကို ဒီမှာထည့်ပါ..." className="w-full rounded-2xl border border-slate-200 p-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"/>
+      <button disabled={busy || (!input.trim() && !sourceFile)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-extrabold text-white disabled:opacity-50">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Sparkles className="h-4 w-4"/>}{busy?'AI လုပ်ဆောင်နေသည်...':'AI Agent ကို စတင်မည်'}</button>
       <p className="text-[10px] text-slate-500">AI အဖြေများသည် အကြံပြုချက်သာဖြစ်ပြီး အမှတ်ပေးခြင်းနှင့် စာမေးပွဲအဖြေများကို ဆရာ/ဆရာမက စစ်ဆေးအတည်ပြုရပါမည်။</p>
     </form>
 
