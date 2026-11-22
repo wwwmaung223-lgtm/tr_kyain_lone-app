@@ -22,9 +22,6 @@ async function verifyTeacher(accessToken) {
   const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!base || !key || !accessToken) return false;
   try {
-    const response = await request(`${base}/rest/v1/profiles?select=id&id=eq.${encodeURIComponent('')}`, {
-      headers: { apikey: key, Authorization: `Bearer ${accessToken}` }
-    }, 9000);
     // Verify the JWT with Auth rather than trusting browser-supplied identity or metadata.
     const auth = await request(`${base}/auth/v1/user`, {
       headers: { apikey: key, Authorization: `Bearer ${accessToken}` }
