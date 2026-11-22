@@ -46,7 +46,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
     let live = true;
     if (!user?.id) { setAdmin(false); return; }
     supabase.rpc('is_platform_admin').then(({ data, error: adminError }) => {
-      if (live) setAdmin(!adminError && data === true);
+      if (live) { const allowed = !adminError && data === true; setAdmin(allowed); if (allowed) setSubscription({ status: 'admin_free', plan_code: 'admin_free', current_period_ends_at: null }); }
     });
     return () => { live = false; };
   }, [user?.id, supabase]);
@@ -126,7 +126,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
     {error && <div className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 p-3 text-sm">{error}</div>}
     {notice && <div className="rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 text-sm">{notice}</div>}
 
-    <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
+    {!isAdmin && <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-indigo-600"/><h3 className="font-extrabold">သင့် Plan ကို ရွေးချယ်ပါ</h3></div>
       <div className="grid grid-cols-2 gap-2">
         {PLANS.map(p => <button key={p.code} onClick={() => setSelectedPlan(p.code)} className={'text-left rounded-2xl p-3 border transition ' + (selectedPlan === p.code ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 bg-white')}>
@@ -135,9 +135,9 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
           <p className="text-[10px] text-slate-500">{p.days} ရက် အသုံးပြုခွင့်</p>
         </button>)}
       </div>
-    </section>
+    </section>}
 
-    <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
+    {!isAdmin && <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-emerald-600"/><h3 className="font-extrabold">KPay ဖြင့် ငွေပေးချေပါ</h3></div>
       <div className="rounded-2xl bg-slate-50 border p-3 flex gap-3 items-center">
         <div className="w-28 h-28 rounded-xl bg-white border p-1 flex items-center justify-center"><QRCodeSVG value="hQZLQlpQYXlhQE8C8FACEFECMTFXFgl5GZCGfSYREBAfnwgEAQGfJAEwFE1a1d57aaa52" size={100} level="H" includeMargin /></div>
@@ -153,7 +153,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
         </button>
       </form>
       <p className="text-[11px] text-slate-500">ပြေစာပုံနှင့် Code ကို လက်ခံရရှိပြီးနောက် Admin က KPay မှ ငွေဝင်မှုကို ကိုယ်တိုင်စစ်ဆေးပြီးမှ Plan ကို အတည်ပြုပါမယ်။</p>
-    </section>
+    </section>}
 
     <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between"><h3 className="font-extrabold">Payment History</h3><button onClick={refresh} className="text-xs text-indigo-700 flex items-center gap-1"><RefreshCw className="w-3 h-3"/> Refresh</button></div>
