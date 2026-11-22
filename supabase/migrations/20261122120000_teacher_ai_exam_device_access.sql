@@ -130,6 +130,19 @@ create table if not exists public.exam_room_participants (
   created_at timestamptz not null default now()
 );
 create index if not exists exam_room_participants_room_idx on public.exam_room_participants(room_id,created_at);
+
+do $
+begin
+  if exists(select 1 from pg_publication where pubname='supabase_realtime') then
+    if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='exam_room_participants') then
+      alter publication supabase_realtime add table public.exam_room_participants;
+    end if;
+    if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='exam_rooms') then
+      alter publication supabase_realtime add table public.exam_rooms;
+    end if;
+  end if;
+end $;
+
 alter table public.exam_rooms enable row level security;
 alter table public.exam_room_participants enable row level security;
 drop policy if exists "Teachers manage own exam rooms" on public.exam_rooms;
