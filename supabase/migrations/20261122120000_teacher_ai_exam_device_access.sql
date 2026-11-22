@@ -135,16 +135,10 @@ alter table public.exam_room_participants enable row level security;
 drop policy if exists "Teachers manage own exam rooms" on public.exam_rooms;
 create policy "Teachers manage own exam rooms" on public.exam_rooms
   for all to authenticated using(teacher_id=(select auth.uid())) with check(teacher_id=(select auth.uid()));
-drop policy if exists "Students read active exam rooms by code" on public.exam_rooms;
-create policy "Students read active exam rooms by code" on public.exam_rooms
-  for select to anon, authenticated using(status in ('waiting','live'));
 drop policy if exists "Teachers manage own exam participants" on public.exam_room_participants;
 create policy "Teachers manage own exam participants" on public.exam_room_participants
   for all to authenticated using(exists(select 1 from public.exam_rooms r where r.id=room_id and r.teacher_id=(select auth.uid())))
   with check(exists(select 1 from public.exam_rooms r where r.id=room_id and r.teacher_id=(select auth.uid())));
-drop policy if exists "Participants can join and resume exam" on public.exam_room_participants;
-create policy "Participants can join and resume exam" on public.exam_room_participants
-  for all to anon, authenticated using(true) with check(true);
 
 create or replace function public.create_exam_room(p_quiz_code text, p_join_code text)
 returns uuid
@@ -161,6 +155,57 @@ begin
   return v_room;
 end;
 $$;
+
+
+-- Anonymous students never receive direct table access. They join/save only through
+-- narrowly scoped SECURITY DEFINER RPCs using the room's unguessable join code.
+create or replace function public.join_exam_room(p_join_code text, p_student_name text, p_student_code text default null)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $
+declare v_room public.exam_rooms%rowtype; v_participant uuid;
+begin
+  if p_student_name is null or length(trim(p_student_name))<2 or length(trim(p_student_name))>100 then
+    raise exception 'Enter a valid student name';
+  end if;
+  select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code)) and status in ('waiting','live');
+  if not found then raise exception 'Exam room not found or closed'; end if;
+  insert into public.exam_room_participants(room_id,student_name,student_code,status)
+  values(v_room.id,left(trim(p_student_name),100),left(nullif(trim(p_student_code),''),50),'joined')
+  returning id into v_participant;
+  return jsonb_build_object('participant_id',v_participant,'room_id',v_room.id,'quiz_code',v_room.quiz_code,'status',v_room.status);
+end;
+$;
+
+create or replace function public.save_exam_room_answers(p_join_code text, p_participant_id uuid, p_answers jsonb, p_submit boolean default false)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, auth
+as $
+declare v_room_id uuid;
+begin
+  if jsonb_typeof(coalesce(p_answers,'{}'::jsonb))<>'object' or octet_length(coalesce(p_answers,'{}'::jsonb)::text)>50000 then
+    raise exception 'Invalid answer payload';
+  end if;
+  select id into v_room_id from public.exam_rooms
+    where join_code=upper(trim(p_join_code)) and status='live';
+  if v_room_id is null then raise exception 'Exam is not accepting answers'; end if;
+  update public.exam_room_participants set answers=p_answers,
+    status=case when p_submit then 'completed' else 'in_progress' end,
+    last_saved_at=now(),submitted_at=case when p_submit then now() else null end
+    where id=p_participant_id and room_id=v_room_id;
+  if not found then raise exception 'Participant not found'; end if;
+  return jsonb_build_object('success',true,'saved_at',now(),'status',case when p_submit then 'completed' else 'in_progress' end);
+end;
+$;
+
+revoke all on function public.join_exam_room(text,text,text) from public;
+grant execute on function public.join_exam_room(text,text,text) to anon, authenticated;
+revoke all on function public.save_exam_room_answers(text,uuid,jsonb,boolean) from public;
+grant execute on function public.save_exam_room_answers(text,uuid,jsonb,boolean) to anon, authenticated;
 
 revoke all on function public.grant_teacher_ai_lifetime(text,text) from public, anon;
 grant execute on function public.grant_teacher_ai_lifetime(text,text) to authenticated;
