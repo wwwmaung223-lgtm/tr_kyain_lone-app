@@ -17,10 +17,10 @@ async function request(url, options, timeout = API_TIMEOUT_MS) {
   }
 }
 
-async function verifyTeacher(accessToken) {
+async function verifyTeacher(accessToken, deviceId) {
   const base = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!base || !key || !accessToken) return false;
+  if (!base || !key || !accessToken || !deviceId) return false;
   try {
     // Verify the JWT with Auth rather than trusting browser-supplied identity or metadata.
     const auth = await request(`${base}/auth/v1/user`, {
@@ -34,7 +34,12 @@ async function verifyTeacher(accessToken) {
     }, 9000);
     if (!profile.ok) return false;
     const rows = await profile.json();
-    return Array.isArray(rows) && rows.length === 1;
+    if (!Array.isArray(rows) || rows.length !== 1) return false;
+    const device = await request(`${base}/rest/v1/rpc/touch_teacher_device`, {
+      method: 'POST', headers: { apikey: key, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_device_id: deviceId })
+    }, 9000);
+    return device.ok && (await device.json()) === true;
   } catch {
     return false;
   }
@@ -123,7 +128,8 @@ export default async function handler(req, res) {
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
   const accessToken = asText(body.accessToken);
-  if (!(await verifyTeacher(accessToken))) return json(res, 401, { success: false, error: 'Teacher session could not be verified.' });
+  const deviceId = asText(body.deviceId);
+  if (!(await verifyTeacher(accessToken, deviceId))) return json(res, 401, { success: false, error: 'Teacher session could not be verified.' });
 
   const task = asText(body.task);
   if (!TASKS.has(task)) return json(res, 400, { success: false, error: 'Unsupported AI task.' });
