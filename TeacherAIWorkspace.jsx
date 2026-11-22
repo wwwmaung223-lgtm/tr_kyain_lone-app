@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bot, BookOpen, ClipboardCheck, GraduationCap, Loader2, Sparkles, ShieldCheck, WandSparkles } from 'lucide-react';
+import { BookOpen, ClipboardCheck, GraduationCap, Loader2, Sparkles, ShieldCheck, WandSparkles } from 'lucide-react';
+import TeacherExamRooms from './TeacherExamRooms.jsx';
 
 const agents = [
   { id: 'question', label: 'Question Agent', mm: 'မေးခွန်းဖန်တီးသူ', icon: BookOpen, hint: 'မေးခွန်းစာသား၊ စာအုပ်အပိုင်း သို့မဟုတ် OCR ထုတ်ထားသောစာသားကို ထည့်ပါ။' },
@@ -92,6 +93,8 @@ export default function TeacherAIWorkspace({ supabase, user, onClose }) {
     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
     {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{notice}</p>}
     {result && <section className="rounded-3xl border border-emerald-200 bg-white p-4 shadow-sm"><div className="flex items-center gap-2 text-emerald-700"><ShieldCheck className="h-5 w-5"/><h3 className="font-extrabold">Teacher Review Required</h3></div><p className="mt-1 text-[10px] text-slate-500">Provider: {result.provider} · မသိမ်းဆည်းရသေးပါ</p><pre className="mt-3 max-h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-3 text-[11px] leading-5 text-emerald-100">{JSON.stringify(result.result,null,2)}</pre></section>}
+
+    <TeacherExamRooms supabase={supabase} user={user} />
 
     {admin && <section className="rounded-3xl border-2 border-violet-200 bg-white p-4 shadow-sm space-y-3"><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-violet-700"/><h3 className="font-extrabold">Admin · AI Lifetime Access</h3></div><p className="text-xs text-slate-500">ဆရာ/ဆရာမ၏ registered email ဖြင့် AI Agent ကို အမြဲတမ်းအသုံးပြုခွင့်ပေးနိုင်သည်။</p><form onSubmit={grantLifetime} className="space-y-2"><input type="email" required value={grantEmail} onChange={e=>setGrantEmail(e.target.value)} placeholder="Teacher account email" className="w-full rounded-xl border p-3 text-sm"/><input value={grantNote} onChange={e=>setGrantNote(e.target.value)} placeholder="မှတ်ချက် (Optional)" className="w-full rounded-xl border p-3 text-sm"/><button disabled={grantBusy} className="w-full rounded-xl bg-violet-700 py-3 text-sm font-extrabold text-white disabled:opacity-50">{grantBusy?'လုပ်ဆောင်နေသည်...':'Lifetime AI Access ပေးမည်'}</button></form></section>}
   </div>;
