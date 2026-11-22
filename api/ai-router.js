@@ -57,7 +57,7 @@ function promptFor(task, input) {
 }
 
 function extractJson(text) {
-  const value = String(text || '').trim().replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/, '');
+  const value = String(text || '').trim().replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '');
   const start = value.indexOf('{');
   const end = value.lastIndexOf('}');
   if (start < 0 || end <= start) throw new Error('Provider did not return a JSON object');
