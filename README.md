@@ -1,50 +1,68 @@
-# Tr's Kyain lone — Premium Website v3
+# Tr.Kyain Lone — AI Learning Platform
 
-This is a **website-only** React + Vite project. It is not a native Android/iOS app.
+A responsive, bilingual (Myanmar + English) learning and assessment platform for teachers and students. Built with React, Vite, Supabase and a server-side Gemini API.
 
-## Included
+## Features
 
-- Premium responsive UI foundation (mobile, tablet and desktop)
-- Teacher email/password authentication using Firebase Auth
-- Teacher quiz builder with MCQ and written questions
-- Edit and delete previously created quizzes
-- Six-character quiz codes and shareable query links (`/?q=ABC123`)
-- Student quiz portal, timer and submission flow
-- Teacher grading dashboard, leaderboard and gradebook
-- Result share links (`/?s=ABC123`)
-- Gemini image-to-quiz serverless API (`/api/generate-quiz`); the Gemini key stays server-side
-- Vercel deployment configuration
+- Teacher email/password sign-in with Supabase Auth.
+- AI photo/PDF-to-quiz workflow using Gemini; the API key stays server-side.
+- Manual MCQ and written-question editing, answer-key selection, marks and time limits.
+- Instant answer-sheet builder for teachers who do not need AI generation.
+- Six-character student quiz codes and shareable quiz links.
+- Student quiz-taking, timed assessments and submission history.
+- Teacher review, grading, leaderboard and gradebook views.
+- Teaching Hub for classes, lesson plans, question bank and homework assignment records.
+- KPay subscription request flow with private receipt uploads and manual admin review.
+- Supabase Row Level Security and server-side MCQ grading.
+- Responsive mobile and desktop UI; Figma design source includes the shared visual tokens and reusable icon components.
 
-## Run locally
+## Local development
 
-1. Install Node.js 20 or later.
-2. Copy `.env.example` to `.env.local` and fill the Firebase web app values.
-3. Add `GEMINI_API_KEY` to `.env.local` for the AI image-to-quiz feature.
-4. Run:
+Requirements: Node.js 20 or later.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite.
+## Environment variables
 
-## Deploy to Vercel
+Frontend (Vite):
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-1. Push this project folder to a GitHub repository.
-2. Import the repository in Vercel. Framework should be detected as Vite.
-3. Add all Firebase `VITE_FIREBASE_*` values in Vercel → Project → Settings → Environment Variables.
-4. Add `GEMINI_API_KEY` and optionally `GEMINI_MODEL=gemini-2.5-flash` as server environment variables. Do **not** prefix the Gemini key with `VITE_`.
-5. Deploy and enable Firebase Authentication → Email/Password and Firestore in Firebase Console.
+Vercel server-side:
+- `GEMINI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
 
-Optional short-domain setting: set `VITE_PUBLIC_SHORT_BASE_URL` to a custom domain that points to this same Vercel deployment, for example `https://your-short-domain.example`. Without a custom short domain, links use the deployed website's normal domain plus `/?q=CODE` or `/?s=CODE`. Six-character codes are short identifiers; they cannot shorten a long domain by themselves.
+Do not put the Gemini API key or any Supabase service-role/secret key in a `VITE_*` variable. The browser must use only the publishable key.
 
-## Important production checklist
+## Supabase setup
 
-The uploaded v2 source uses direct client-side Firestore access and stores answer keys in quiz documents that the student client can fetch. It also has localStorage fallback writes. This is acceptable only for a private prototype/demo, **not a secure public examination system**: a technically skilled student could inspect client data, and a local-only submission will not reach the teacher on another device.
+1. Enable Email/Password under Supabase Auth providers.
+2. Configure the site's production URL and local development URL in Auth URL Configuration.
+3. Apply the SQL migrations in `supabase/migrations` in timestamp order.
+4. Keep RLS enabled on exposed public tables and retain the ownership/subscription policies.
+5. Keep the `kpay-receipts` bucket private; signed URLs are used for admin review.
+6. Enable leaked-password protection in Supabase Auth settings before public launch.
 
-Before using this for real exams, migrate quiz answer keys and grading to a trusted server (Firebase Admin / Vercel API), keep answer keys in teacher-only documents, validate teacher ownership on the server, and apply restrictive Firestore Security Rules. Do not use permissive test-mode Firestore rules in production. This project does not pretend that a browser-only code change can provide server-side secrecy or cross-device persistence without the required Firebase server credentials and security-rule configuration.
+## Vercel deployment
 
-## Firebase configuration notes
+The project is linked to the GitHub repository `wwwmaung223-lgtm/tr_kyain_lone-app`. Pushes to `main` trigger deployments when the Git integration is active. Set the environment variables above in the Vercel project before using AI generation.
 
-Firebase web config values identify the web app and are intended to be used in the browser; Firestore Security Rules and Authentication determine access. Never put a Firebase Admin service-account JSON or Gemini API key in `VITE_*` variables or in client source.
+## Production verification checklist
+
+- Test teacher sign-in, sign-out, trial access and subscription gating.
+- Create a quiz, publish it, open the short link from a separate browser/device, submit as a student and verify it appears in the teacher dashboard.
+- Test image and PDF uploads with the Gemini endpoint and confirm generated questions are reviewed before publishing.
+- Verify MCQ grades are computed server-side and student-facing quiz data does not expose answer keys.
+- Test KPay receipt upload, private storage and admin approval/rejection.
+- Test mobile and desktop layouts, network errors, empty states and slow loading.
+- Confirm Vercel Production is publicly reachable for students; preview deployments may remain protected by SSO.
+
+## Important limitations
+
+- KPay approval is a manual verification workflow; it is not an automated payment gateway.
+- AI output must be checked by the teacher before publishing. OCR/AI can misread poor-quality photos, handwriting and complex layouts.
+- Teaching Hub currently provides teacher-side class, lesson, question-bank and homework records; student homework submission and class roster workflows still need to be completed before claiming a full school-management suite.
