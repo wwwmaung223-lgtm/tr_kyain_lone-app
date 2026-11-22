@@ -65,6 +65,7 @@ The project is linked to the GitHub repository `wwwmaung223-lgtm/tr_kyain_lone-a
 
 - `20261122074501_gate_class_students_subscription.sql` — applies the subscription access gate to teacher class rosters.
 - `20261122074634_add_teaching_platform_foreign_key_indexes.sql` — adds indexes for teacher, lesson, homework and payment foreign keys.
+- `20261122074840_gate_homework_submissions_subscription.sql` — keeps teacher-side homework submission records behind the subscription access gate.
 
 ## Important limitations
 
