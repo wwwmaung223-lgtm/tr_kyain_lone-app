@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import SubscriptionCenter from './SubscriptionCenter.jsx';
 import TeachingHub from './TeachingHub.jsx';
+import AiQuizStudio from './AiQuizStudio.jsx';
 import {
   Camera,
   Sparkles,
@@ -471,7 +472,7 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  const handleRunGeminiPhotoToQuiz = async () => {
+  const handleRunGeminiPhotoToQuiz = async (instruction = aiPromptNote) => {
     if (!uploadedBase64) {
       setAiError('မေးခွန်းဓာတ်ပုံ သို့မဟုတ် PDF ဖိုင် အရင်ရွေးချယ်ပေးပါ ဆရာ/ဆရာမ။');
       return;
@@ -488,7 +489,7 @@ export default function App() {
       const aiResult = await generateQuizFromApi(
         uploadedBase64,
         uploadedMime,
-        aiPromptNote,
+        instruction,
         setAiStatus
       );
       setQuizTitle(aiResult.title);
@@ -979,7 +980,7 @@ export default function App() {
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[16px] font-extrabold tracking-tight bg-gradient-to-r from-indigo-700 to-violet-600 bg-clip-text text-transparent truncate">
-                    Tr&apos;s Kyain lone
+                    Tr.Kyain Lone
                   </span>
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-500/10 text-indigo-700 border border-indigo-200/60 shrink-0">
                     Quiz
@@ -1099,7 +1100,7 @@ export default function App() {
                     <GraduationCap className="w-6 h-6" />
                   </div>
                   <h1 className="text-base font-extrabold text-slate-900">
-                    Tr&apos;s Kyain lone (Teacher Portal)
+                    Tr.Kyain Lone (Teacher Portal)
                   </h1>
                   <p className="text-[11px] text-slate-500">
                     ဆရာ/ဆရာမများ Gmail နှင့် ကိုယ်ပိုင် Password ဖြင့် ဝင်ရောက်ပြီး မေးခွန်းထုတ်ခြင်းနှင့် အမှတ်စစ်ခြင်းများ ပြုလုပ်နိုင်ပါသည်
@@ -1320,148 +1321,43 @@ export default function App() {
                       className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-xs shadow-lg shadow-indigo-300/50 active:scale-[0.98] transition"
                     >
                       အောက်မှာ ဖြေရမယ့် Answer Sheet ထုတ်မည်
-                    </button>
-                  </div>
+                    </butto{/* 2. Figma-aligned AI Quiz Studio — upload, settings and live question preview */}
+                  <AiQuizStudio
+                    fileInputRef={fileInputRef}
+                    uploadedPreview={uploadedPreview}
+                    uploadedBase64={uploadedBase64}
+                    uploadedMime={uploadedMime}
+                    uploadedFileName={uploadedFileName}
+                    handleImageSelect={handleImageSelect}
+                    handleRunGeminiPhotoToQuiz={handleRunGeminiPhotoToQuiz}
+                    isAiGenerating={isAiGenerating}
+                    aiStatus={aiStatus}
+                    aiError={aiError}
+                    aiPromptNote={aiPromptNote}
+                    setAiPromptNote={setAiPromptNote}
+                    quizTitle={quizTitle}
+                    setQuizTitle={(value) => { setQuizTitle(value); setGeneratedQuizLink(''); }}
+                    quizDesc={quizDesc}
+                    setQuizDesc={setQuizDesc}
+                    timeLimitMinutes={timeLimitMinutes}
+                    setTimeLimitMinutes={setTimeLimitMinutes}
+                    questions={questions}
+                    totalBuilderMarks={totalBuilderMarks}
+                    onClear={() => {
+                      setQuizTitle('');
+                      setQuizDesc('');
+                      setQuestions([]);
+                      setGeneratedQuizLink('');
+                      setGeneratedQuizCode('');
+                      setUploadedPreview('');
+                      setUploadedBase64('');
+                      setUploadedFileName('');
+                      setAiPromptNote('');
+                      setWorksheetImage('');
+                    }}
+                  />
 
-                  {/* 2. Optional AI Photo Scanner Card */}
-                  <details className="ios-glass rounded-[26px] p-4">
-                    <summary className="text-xs font-extrabold text-slate-700 cursor-pointer flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <Wand2 className="w-4 h-4 text-indigo-600" />
-                        <span>AI ဖြင့် မေးခွန်းစာသား ဖတ်ထုတ်ရန် (Optional)</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400">နှိပ်၍ဖွင့်ပါ</span>
-                    </summary>
-
-                    <div className="pt-3 space-y-3">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,application/pdf,.pdf"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
-
-                      {!uploadedPreview && !uploadedBase64 ? (
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full py-5 px-4 rounded-2xl border-2 border-dashed border-indigo-300/80 bg-indigo-50/40 flex flex-col items-center justify-center gap-1.5"
-                        >
-                          <Camera className="w-5 h-5 text-indigo-600" />
-                          <span className="text-xs font-bold text-indigo-950">
-                            မေးခွန်းဓာတ်ပုံ / PDF ရွေးမည်
-                          </span>
-                        </button>
-                      ) : (
-                        <div className="relative rounded-2xl overflow-hidden border border-white shadow-sm bg-slate-900/5">
-                          {uploadedMime === 'application/pdf' ? (
-                            <div className="w-full py-6 flex flex-col items-center justify-center gap-1 text-indigo-700">
-                              <FileText className="w-10 h-10" />
-                              <span className="text-xs font-bold">{uploadedFileName}</span>
-                            </div>
-                          ) : (
-                            <img src={uploadedPreview} alt="Uploaded Question Sheet" className="w-full max-h-40 object-cover" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-white/90 text-slate-800 text-[11px] font-bold shadow-sm flex items-center gap-1"
-                          >
-                            <ImageIcon className="w-3 h-3 text-indigo-600" />
-                            <span>ဖိုင်ပြောင်းမည်</span>
-                          </button>
-                        </div>
-                      )}
-
-                      <input
-                        type="text"
-                        value={aiPromptNote}
-                        onChange={(e) => setAiPromptNote(e.target.value)}
-                        placeholder="AI မှာကြားချက် (ဥပမာ - ရွေးဖြေ ၅ ပုဒ် ထုတ်ပေးပါ)"
-                        className="w-full px-3.5 py-2 rounded-2xl bg-white/85 border border-slate-200/90 text-xs text-slate-800 outline-none"
-                      />
-
-                      {isAiGenerating && (
-                        <p className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-3 py-2 rounded-xl">
-                          အခြေအနေ - {aiStatus || 'AI က မေးခွန်းများ ဖန်တီးနေပါသည်...'}
-                        </p>
-                      )}
-                      {aiError && (
-                        <p className="text-[11px] font-semibold text-rose-600 bg-rose-50/90 px-3 py-2 rounded-xl">
-                          {aiError}
-                        </p>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleRunGeminiPhotoToQuiz}
-                        disabled={isAiGenerating}
-                        className="w-full py-2.5 px-4 rounded-2xl bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-60"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        <span>{isAiGenerating ? 'ဖန်တီးနေပါသည်...' : 'AI ဖြင့် မေးခွန်းထုတ်မည်'}</span>
-                      </button>
-                    </div>
-                  </details>
-
-                  {/* 3. Quiz Title & Quick Summary Card */}
-                  <div className="ios-glass rounded-[26px] p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-slate-800">
-                        မေးခွန်းလွှာ အချက်အလက်
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold">
-                          {questions.length} ပုဒ် • {totalBuilderMarks} မှတ်
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setQuizTitle('');
-                            setQuizDesc('');
-                            setQuestions([]);
-                            setGeneratedQuizLink('');
-                            setGeneratedQuizCode('');
-                            setUploadedPreview('');
-                            setUploadedBase64('');
-                            setWorksheetImage('');
-                          }}
-                          className="p-1.5 rounded-full bg-white/80 text-slate-500 hover:text-rose-600"
-                          title="Clear All"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <input
-                      type="text"
-                      value={quizTitle}
-                      onChange={(e) => {
-                        setQuizTitle(e.target.value);
-                        setGeneratedQuizLink('');
-                      }}
-                      placeholder="မေးခွန်းခေါင်းစဉ် (Quiz Title)"
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-white/90 border border-slate-200/80 text-sm font-bold text-slate-900 focus:border-indigo-400 outline-none"
-                    />
-
-                    <input
-                      type="text"
-                      value={quizDesc}
-                      onChange={(e) => setQuizDesc(e.target.value)}
-                      placeholder="ညွှန်ကြားချက် (Optional description)"
-                      className="w-full px-3.5 py-2 rounded-2xl bg-white/80 border border-slate-200/80 text-xs text-slate-700 focus:border-indigo-400 outline-none"
-                    />
-                    <label className="block text-xs font-bold text-slate-700">စာမေးပွဲအချိန် (မိနစ်) — 0 = အချိန်မကန့်သတ်</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="300"
-                      value={timeLimitMinutes}
-                      onChange={(e) => setTimeLimitMinutes(Math.max(0, Math.min(300, Number(e.target.value) || 0)))}
-                      className="w-full px-3.5 py-2 rounded-2xl bg-white/80 border border-slate-200/80 text-xs text-slate-700 focus:border-indigo-400 outline-none"
-                    />
+                  />
                   </div>
 
                   {/* 4. Editable Questions List (အဖြေမှန် ရွေးချယ်သတ်မှတ်ရန်) */}
@@ -1742,7 +1638,7 @@ export default function App() {
                   <div className="ios-glass-strong rounded-[28px] p-5 space-y-3.5">
                     <div className="flex items-center justify-between">
                       <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-extrabold">
-                        Teacher: {activeQuiz.teacherName || "Tr's Kyain lone"}
+                        Teacher: {activeQuiz.teacherName || "Tr.Kyain Lone"}
                       </span>
                       <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 text-[10px] font-extrabold">
                         စုစုပေါင်း {activeQuizTotalMarks} မှတ်
