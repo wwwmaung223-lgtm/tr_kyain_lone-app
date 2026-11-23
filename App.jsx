@@ -1006,6 +1006,15 @@ export default function App() {
 
   const showTeacherAuthGate = !teacherAccount && activeTab !== 'student';
 
+  const openTeacherTab = (tab) => {
+    if (!teacherAccount) {
+      setActiveTab('creator');
+      notify('ဤအပိုင်းကို အသုံးပြုရန် Teacher Account ဖြင့် Login ဝင်ပါ။');
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   const displayWorksheetImg = activeQuiz?.worksheetImage || (activeQuiz?.code === generatedQuizCode ? worksheetImage : '');
 
   // ==========================================================================
@@ -1093,7 +1102,7 @@ export default function App() {
         {/* ==================================================================
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
+        <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-36 space-y-4">
           {activeTab === 'ai' && teacherAccount ? (
             <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading AI Agents…</div>}>
               <TeacherAIWorkspace supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
@@ -2300,7 +2309,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('ai')}
+              onClick={() => openTeacherTab('ai')}
               className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${activeTab === 'ai' ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
             >
               <span className="text-sm">✨</span>
@@ -2309,7 +2318,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('teaching')}
+              onClick={() => openTeacherTab('teaching')}
               className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'teaching'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
@@ -2322,7 +2331,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('subscription')}
+              onClick={() => openTeacherTab('subscription')}
               className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'subscription'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
@@ -2335,7 +2344,7 @@ export default function App() {
 
             <button
               type="button"
-              onClick={() => setActiveTab('dashboard')}
+              onClick={() => openTeacherTab('dashboard')}
               className={`relative py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
