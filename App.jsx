@@ -4,6 +4,7 @@ const SubscriptionCenter = React.lazy(() => import('./SubscriptionCenter.jsx'));
 const TeachingHub = React.lazy(() => import('./TeachingHub.jsx'));
 const AiQuizStudio = React.lazy(() => import('./AiQuizStudio.jsx'));
 const TeacherAIWorkspace = React.lazy(() => import('./TeacherAIWorkspace.jsx'));
+import StudentExamRoom from './StudentExamRoom.jsx';
 import {
   Camera,
   Sparkles,
@@ -1103,7 +1104,9 @@ export default function App() {
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-36 space-y-4">
-          {activeTab === 'ai' && teacherAccount ? (
+          {new URLSearchParams(window.location.search).get('e') ? (
+            <StudentExamRoom supabase={supabase} joinCode={new URLSearchParams(window.location.search).get('e')} />
+          ) : activeTab === 'ai' && teacherAccount ? (
             <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading AI Agents…</div>}>
               <TeacherAIWorkspace supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
             </React.Suspense>
