@@ -154,6 +154,11 @@ create policy "Teachers manage own exam participants" on public.exam_room_partic
   for all to authenticated using(exists(select 1 from public.exam_rooms r where r.id=room_id and r.teacher_id=(select auth.uid())))
   with check(exists(select 1 from public.exam_rooms r where r.id=room_id and r.teacher_id=(select auth.uid())));
 
+-- The teacher UI accesses these tables through the authenticated Data API.
+-- Anonymous students must use only the scoped join/resume/save RPCs below.
+grant select, insert, update, delete on public.exam_rooms to authenticated;
+grant select, insert, update, delete on public.exam_room_participants to authenticated;
+
 create or replace function public.create_exam_room(p_quiz_code text, p_join_code text)
 returns uuid
 language plpgsql
@@ -248,6 +253,8 @@ begin
 end;
 $$;
 
+revoke all on function public.create_exam_room(text,text) from public, anon;
+grant execute on function public.create_exam_room(text,text) to authenticated;
 revoke all on function public.join_exam_room(text,text,text) from public;
 grant execute on function public.join_exam_room(text,text,text) to anon, authenticated;
 revoke all on function public.resume_exam_room(text,uuid,uuid) from public;
