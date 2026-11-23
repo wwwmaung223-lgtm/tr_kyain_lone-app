@@ -4,7 +4,7 @@ import { ArrowLeft, ShieldCheck, LayoutDashboard, CreditCard, Users, Settings2, 
 
 const ADMIN_EMAIL = 'myintaung7432@gmail.com';
 const money = value => new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Ks';
-const card = 'rounded-2xl border border-white/80 bg-white/85 p-4 shadow-[0_10px_30px_rgba(57,52,128,.07)] backdrop-blur-xl';
+const card = 'rounded-2xl border border-white/80 bg-white p-4 shadow-[0_10px_30px_rgba(57,52,128,.07)]';
 const field = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
 
 export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogout }) {
@@ -163,9 +163,9 @@ export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogou
 
   if (checking) return createPortal(<div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overscroll-y-contain bg-slate-950/35 p-4 backdrop-blur-lg"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>, document.body);
 
-  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-950/30 backdrop-blur-lg text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-950/55 backdrop-blur-2xl text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
     <div className="mx-auto min-h-[100dvh] w-full min-w-0 max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
-      <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/80 p-3 shadow-sm backdrop-blur-xl">
+      <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white p-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500 text-white"><ShieldCheck className="h-5 w-5"/></div><div className="min-w-0"><p className="truncate text-sm font-black">Platform Admin</p><p className="truncate text-[11px] text-slate-500">Tr.Kyain Lone · Secure Console</p></div></div>
         <div className="flex shrink-0 items-center gap-2">
           {authorized && <button onClick={logout} disabled={busy} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50"><LogOut className="mr-1 inline h-4 w-4"/> Logout</button>}
@@ -189,14 +189,14 @@ export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogou
             ['Accounts',users.length,Users],['Active access',activeCount,ShieldCheck],['Pending payments',pendingCount,Clock3],['Plans',plans.length,CreditCard]
           ].map(([label,value,Icon])=><div key={label} className={card+' min-w-0'}><Icon className="h-4 w-4 text-violet-600"/><p className="mt-2 text-xl font-black tabular-nums">{value}</p><p className="truncate text-[10px] font-semibold text-slate-500">{label}</p></div>)}
         </div>
-        <nav aria-label="Admin sections" className="mb-4 flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-2xl border border-white bg-white/80 p-1 shadow-sm">
+        <nav aria-label="Admin sections" className="mb-4 flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-2xl border border-white bg-white p-1 shadow-sm">
           {[
             ['overview','Overview',LayoutDashboard],['plans','Plans',CreditCard],['payments','Payments',Wallet],['accounts','Users',Users],['payment-account','Pay account',Settings2]
           ].map(([key,label,Icon])=><button key={key} onClick={()=>setTab(key)} className={'flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[10px] font-bold sm:min-w-0 sm:flex-1 sm:flex-row sm:justify-center sm:text-xs '+(tab===key?'bg-violet-600 text-white shadow':'text-slate-600')}><Icon className="h-4 w-4"/>{label}</button>)}
         </nav>
         {error && <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
         {notice && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{notice}</div>}
-        <div className="mb-3 flex justify-end"><button onClick={loadData} disabled={busy} className="rounded-xl border border-white bg-white/80 px-3 py-2 text-xs font-bold text-slate-600"><RefreshCw className={'mr-1 inline h-3.5 w-3.5 '+(busy?'animate-spin':'')}/> Refresh</button></div>
+        <div className="mb-3 flex justify-end"><button onClick={loadData} disabled={busy} className="rounded-xl border border-white bg-white px-3 py-2 text-xs font-bold text-slate-600"><RefreshCw className={'mr-1 inline h-3.5 w-3.5 '+(busy?'animate-spin':'')}/> Refresh</button></div>
 
         {tab==='overview' && <div className="grid gap-3 md:grid-cols-2">
           <section className={card}><h2 className="font-extrabold">Recent payments</h2>{payments.slice(0,5).map(p=><div key={p.id} className="flex items-center justify-between gap-2 border-b border-slate-100 py-3 last:border-0"><div className="min-w-0"><p className="truncate text-xs font-bold">{users.find(u=>u.user_id===p.user_id)?.email||p.user_id}</p><p className="text-[10px] text-slate-500">{p.plan_code} · {money(p.amount_mmk)}</p></div><span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold">{p.status}</span></div>)}{!payments.length&&<p className="py-5 text-center text-xs text-slate-500">Payment မရှိသေးပါ။</p>}</section>
