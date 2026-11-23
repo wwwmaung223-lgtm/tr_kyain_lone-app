@@ -987,7 +987,7 @@ export default function App() {
       `}</style>
 
       {/* Responsive app container */}
-      <div className="relative z-10 w-full min-w-0 max-w-full min-h-screen flex flex-col sm:my-4 sm:min-h-[calc(100vh-2rem)] sm:rounded-[42px] sm:border-[6px] sm:border-white/80 sm:shadow-[0_25px_70px_-15px_rgba(79,70,229,0.22)] overflow-x-clip">
+      <div className="relative z-10 w-full max-w-[1100px] min-h-screen flex flex-col sm:my-4 sm:min-h-[calc(100vh-2rem)] sm:rounded-[42px] sm:border-[6px] sm:border-white/80 sm:shadow-[0_25px_70px_-15px_rgba(79,70,229,0.22)] overflow-x-clip">
         {/* Top Floating Glass Header */}
         <header className="sticky top-0 z-30 px-4 pt-3 pb-2">
           <div className="ios-glass-strong rounded-[26px] px-4 py-2.5 flex items-center justify-between">
