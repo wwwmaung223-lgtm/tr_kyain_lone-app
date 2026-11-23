@@ -167,12 +167,12 @@ export async function onRequest({ request, env }) {
   const openaiKey = env.OPENAI_API_KEY;
   const groqKey = env.GROQ_API_KEY;
   if (request.method === 'GET') return json({
-    key_set: !!(key || openaiKey || groqKey),
-    providers: { gemini: !!key, openai: !!openaiKey, groq: !!groqKey },
+    key_set: !!(env.AI || key || openaiKey || groqKey),
+    providers: { cloudflare: !!env.AI, gemini: !!key, openai: !!openaiKey, groq: !!groqKey },
     supabase_configured: !!((env.SUPABASE_URL || env.VITE_SUPABASE_URL) && (env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY))
   });
   if (request.method !== 'POST') return json({ success: false, error: 'POST only' }, 405);
-  if (!key && !openaiKey && !groqKey) return json({ success: false, error: 'AI Provider Secret မတွေ့ပါ။ Gemini, OpenAI သို့မဟုတ် Groq API key တစ်ခုခု ထည့်ပါ။' }, 500);
+  if (!env.AI && !key && !openaiKey && !groqKey) return json({ success: false, error: 'AI Provider မချိတ်ရသေးပါ။ Workers AI Binding သို့မဟုတ် Gemini/OpenAI/Groq API key တစ်ခုခု လိုအပ်ပါတယ်။' }, 500);
 
   let body;
   try { body = await request.json(); } catch { return json({ success: false, error: 'ပို့လိုက်တဲ့အချက်အလက်ကို ဖတ်မရပါ။' }, 400); }
