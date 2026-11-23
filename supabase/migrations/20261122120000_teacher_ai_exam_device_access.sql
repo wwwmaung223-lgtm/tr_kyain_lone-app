@@ -212,7 +212,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $$
+as $
 declare v_room_id uuid;
 begin
   if jsonb_typeof(coalesce(p_answers,'{}'::jsonb))<>'object' or octet_length(coalesce(p_answers,'{}'::jsonb)::text)>50000 then
