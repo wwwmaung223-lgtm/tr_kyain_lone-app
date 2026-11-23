@@ -223,8 +223,13 @@ begin
   update public.exam_room_participants set answers=p_answers,
     status=case when p_submit then 'completed' else 'in_progress' end,
     last_saved_at=now(),submitted_at=case when p_submit then now() else null end
-    where id=p_participant_id and room_id=v_room_id;
-  if not found then raise exception 'Participant not found'; end if;
+    where id=p_participant_id and room_id=v_room_id and status <> 'completed';
+  if not found then
+    if exists(select 1 from public.exam_room_participants where id=p_participant_id and room_id=v_room_id and status='completed') then
+      raise exception 'Exam response has already been submitted';
+    end if;
+    raise exception 'Participant not found';
+  end if;
   return jsonb_build_object('success',true,'saved_at',now(),'status',case when p_submit then 'completed' else 'in_progress' end);
 end;
 $$;
