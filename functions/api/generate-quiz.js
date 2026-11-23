@@ -167,6 +167,35 @@ export async function onRequest({ request, env }) {
     if (label === 'language') settings.language = value;
   }
   const requestedCount = Math.max(1, Math.min(30, Number(settings.count) || 10));
+  const imagePart = { inline_data: { mime_type: mimeType, data: base64Data } };
+  const prompt = `You are a multimodal OCR specialist, experienced school teacher, assessment designer and answer-key verifier.
+First read the uploaded worksheet/photo/PDF page carefully. Internally transcribe the source in reading order, identify its topic, facts, examples, formulas, exercises and any printed answer choices. Then create a classroom-ready quiz grounded ONLY in that uploaded source.
+
+TEACHER SETTINGS:
+Subject: ${settings.subject || 'Infer from source'}
+Grade: ${settings.grade || 'Appropriate to source'}
+Difficulty: ${settings.difficulty || 'Balanced'}
+Question format: ${settings.questionType || 'Mixed questions'}
+Requested number: ${requestedCount}
+Language: ${settings.language || 'Preserve source language'}
+Additional instruction: ${String(customInstruction).slice(0, 700)}
+
+Return ONLY valid JSON using this schema:
+{"title":"short title","description":"student instruction","sourceText":"faithful concise transcription of the key source content","uncertainParts":["unreadable or ambiguous parts"],"questions":[{"type":"mcq or written","text":"complete question","marks":1,"options":["choice A","choice B","choice C","choice D"],"correctOption":0}]}
+
+QUALITY RULES:
+- Read the actual uploaded material, not the sample quiz or assumed subject. Preserve important terminology, formulas, units, names and facts.
+- Generate up to ${requestedCount} useful questions. If the source does not support that many, return fewer rather than inventing content.
+- If the source is an existing worksheet/question paper, preserve its tested skills and key wording. Do not silently change what is being tested.
+- If the source is lesson notes/textbook material, create new questions that test the key ideas actually present in it.
+- Use a balanced progression of recall, understanding and application appropriate to grade and difficulty.
+- MCQ choices must be plausible, distinct and supported by the topic. Use 3 or 4 choices; never add filler choices just to reach four.
+- correctOption is a zero-based index. Verify the answer against the source and your subject knowledge. If uncertain, make it a written question instead of guessing.
+- Use written questions for explanations, essays, calculations and questions that cannot be fairly assessed by one MCQ.
+- Avoid duplicate, vague, trick or ambiguous questions. Each question must be self-contained.
+- If Myanmar + English is selected, provide clear natural bilingual wording while preserving technical meaning.
+- Do not claim OCR certainty for blurry text. Put unclear sections in uncertainParts.
+- Output JSON only; no markdown fences or commentary.`;
   // Multi-provider routing: OpenAI and Groq handle images; Gemini also handles PDFs.
   const imageOnly = mimeType !== 'application/pdf';
   const providers = [];
