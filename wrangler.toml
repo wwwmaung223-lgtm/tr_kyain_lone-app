@@ -1,0 +1,6 @@
+name = "tr-kyain-lone"
+compatibility_date = "2026-11-23"
+pages_build_output_dir = "./dist"
+
+[ai]
+binding = "AI"
