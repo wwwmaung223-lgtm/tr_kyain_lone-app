@@ -2270,19 +2270,19 @@ export default function App() {
         {/* ==================================================================
             BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
            ================================================================== */}
-        <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-[396px]">
-          <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-5 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
+        <nav aria-label="Main navigation" className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.25rem)] max-w-[560px]">
+          <div className="ios-glass-strong rounded-[24px] p-1 grid grid-cols-6 gap-0.5 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
             <button
               type="button"
               onClick={() => setActiveTab('creator')}
-              className={`py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'creator'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span className="text-[10px] font-bold">မေးခွန်းထုတ်</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold break-words">မေးခွန်းထုတ်</span>
             </button>
 
             <button
@@ -2295,16 +2295,16 @@ export default function App() {
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span className="text-[10px] font-bold">ကျောင်းသားဖြေ</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold break-words">ကျောင်းသားဖြေ</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('ai')}
-              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${activeTab === 'ai' ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${activeTab === 'ai' ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
             >
               <span className="text-sm">✨</span>
-              <span className="text-[10px] font-bold">AI Agents</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold">AI Agents</span>
             </button>
 
             <button
@@ -2317,7 +2317,7 @@ export default function App() {
               }`}
             >
               <span className="text-sm">📚</span>
-              <span className="text-[10px] font-bold">Teaching</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold">Teaching</span>
             </button>
 
             <button
@@ -2330,7 +2330,7 @@ export default function App() {
               }`}
             >
               <span className="text-sm">💳</span>
-              <span className="text-[10px] font-bold">Plan</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold">Plan</span>
             </button>
 
             <button
@@ -2343,7 +2343,7 @@ export default function App() {
               }`}
             >
               <ClipboardCheck className="w-4 h-4" />
-              <span className="text-[10px] font-bold">
+              <span className="w-full text-center text-[9px] leading-tight font-bold break-words">
                 အမှတ်စစ် ({teacherAccount ? teacherSubmissions.length : 0})
               </span>
             </button>
