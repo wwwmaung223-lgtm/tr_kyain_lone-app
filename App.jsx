@@ -40,8 +40,10 @@ import {
 // ============================================================================
 // Supabase setup (Auth + Postgres)
 // ============================================================================
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Public Supabase project configuration. Build-time VITE variables remain optional fallbacks;
+// these public values keep production working even when Pages build variables are absent.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://esoekjjwsbtuyjkrbnam.supabase.co';
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_WE3HWB-BDEor5QgfPpoNxg_K8PLd6_T';
 const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey);
 // Route Supabase browser requests through this site's Pages Function. This avoids
 // mobile-browser cross-origin/network failures while keeping the public key client-side.
