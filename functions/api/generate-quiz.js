@@ -159,14 +159,17 @@ QUALITY RULES:
 - Output JSON only; no markdown fences or commentary.`;
   let result;
   let generationError;
-  for (const model of models.slice(0, 2)) {
+  // Try several available Flash models: a single Gemini model can be temporarily overloaded.
+  for (const model of models.slice(0, 4)) {
     try {
-      // One multimodal pass avoids the previous two sequential long-running Gemini requests.
-      result = await generate(model, key, [{ text: prompt }, imagePart], 25000);
+      result = await generate(model, key, [{ text: prompt }, imagePart], 18000);
       break;
     } catch (e) {
       generationError = e;
-      if (e.status === 429 || e.name === 'AbortError') break;
+      const message = String(e.message || '').toLowerCase();
+      const transient = e.status === 429 || e.status === 500 || e.status === 502 || e.status === 503 || e.status === 504 ||
+        /high demand|overloaded|temporarily unavailable|resource_exhausted|rate limit/i.test(message);
+      if (!transient || e.name === 'AbortError') break;
     }
   }
   if (!result) {
