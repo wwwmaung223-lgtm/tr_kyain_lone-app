@@ -186,18 +186,6 @@ begin
   end if;
   select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code)) and status in ('waiting','live');
   if not found then raise exception 'Exam room not found or closed'; end if;
-  if nullif(trim(p_student_code),'') is not null then
-    select * into v_participant from public.exam_room_participants
-      where room_id=v_room.id and student_code=left(trim(p_student_code),50)
-      order by created_at desc limit 1;
-    if found then
-      update public.exam_room_participants set student_name=left(trim(p_student_name),100),last_saved_at=now()
-        where id=v_participant.id;
-      return jsonb_build_object('participant_id',v_participant.id,'participant_token',v_participant.participant_token,'room_id',v_room.id,
-        'quiz_code',v_room.quiz_code,'room_status',v_room.status,'answers',v_participant.answers,
-        'participant_status',v_participant.status);
-    end if;
-  end if;
   insert into public.exam_room_participants(room_id,student_name,student_code,status)
   values(v_room.id,left(trim(p_student_name),100),left(nullif(trim(p_student_code),''),50),'joined')
   returning * into v_participant;
@@ -206,6 +194,26 @@ begin
     'participant_status',v_participant.status);
 end;
 $$;
+
+
+create or replace function public.resume_exam_room(p_join_code text, p_participant_id uuid, p_participant_token uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype;
+begin
+  select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code));
+  if not found then raise exception 'Exam room not found'; end if;
+  select * into v_participant from public.exam_room_participants
+    where id=p_participant_id and room_id=v_room.id and participant_token=p_participant_token;
+  if not found then raise exception 'Saved student session not found'; end if;
+  return jsonb_build_object('participant_id',v_participant.id,'participant_token',v_participant.participant_token,
+    'room_id',v_room.id,'quiz_code',v_room.quiz_code,'room_status',v_room.status,
+    'answers',v_participant.answers,'participant_status',v_participant.status,'student_name',v_participant.student_name);
+end;
+$;
 
 create or replace function public.save_exam_room_answers(p_join_code text, p_participant_id uuid, p_participant_token uuid, p_answers jsonb, p_submit boolean default false)
 returns jsonb
@@ -237,6 +245,8 @@ $$;
 
 revoke all on function public.join_exam_room(text,text,text) from public;
 grant execute on function public.join_exam_room(text,text,text) to anon, authenticated;
+revoke all on function public.resume_exam_room(text,uuid,uuid) from public;
+grant execute on function public.resume_exam_room(text,uuid,uuid) to anon, authenticated;
 revoke all on function public.save_exam_room_answers(text,uuid,uuid,jsonb,boolean) from public;
 grant execute on function public.save_exam_room_answers(text,uuid,uuid,jsonb,boolean) to anon, authenticated;
 
