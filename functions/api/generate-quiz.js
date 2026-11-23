@@ -16,7 +16,7 @@ async function gfetch(url, key, options = {}, ms = 55000) {
   } finally { clearTimeout(timer); }
 }
 async function pickModels(key) {
-  const response = await gfetch(`${API}/models?pageSize=200`, key, {}, 12000);
+  const response = await gfetch(`${API}/models?pageSize=200`, key, {}, 5000);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error?.message || `models list HTTP ${response.status}`);
   const bad = /(image|tts|live|audio|embedding|embed|robotics|computer|aqa|imagen|veo|learnlm|gemma)/i;
