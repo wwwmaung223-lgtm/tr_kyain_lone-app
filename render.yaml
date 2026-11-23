@@ -3,7 +3,7 @@ services:
     name: tr-kyain-lone-app
     runtime: node
     plan: free
-    branch: main
+    branch: deploy/render-static-site
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /health
