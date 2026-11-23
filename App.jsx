@@ -141,7 +141,7 @@ const normalizeGeneratedQuiz = (result) => {
       type: q.type === 'written' ? 'written' : 'mcq',
       text: String(q.text || ''),
       marks: Math.max(1, Number(q.marks) || (q.type === 'mcq' ? 2 : 5)),
-      options: q.type === 'written' ? [] : (Array.isArray(q.options) && q.options.length === 4 ? q.options : []),
+      options: q.type === 'written' ? [] : (Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 4 ? q.options : []),
       correctOption: q.type === 'written' || q.correctOption === null || q.correctOption === undefined || !Number.isInteger(Number(q.correctOption)) ? null : Number(q.correctOption)
     }))
   };
