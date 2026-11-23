@@ -227,7 +227,7 @@ begin
   if not found then raise exception 'Participant not found'; end if;
   return jsonb_build_object('success',true,'saved_at',now(),'status',case when p_submit then 'completed' else 'in_progress' end);
 end;
-$;
+$$;
 
 revoke all on function public.join_exam_room(text,text,text) from public;
 grant execute on function public.join_exam_room(text,text,text) to anon, authenticated;
