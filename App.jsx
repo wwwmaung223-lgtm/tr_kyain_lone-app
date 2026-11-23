@@ -2288,7 +2288,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab('student')}
-              className={`py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'student'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
@@ -2310,7 +2310,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab('teaching')}
-              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'teaching'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
@@ -2323,7 +2323,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveTab('subscription')}
-              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'subscription'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
