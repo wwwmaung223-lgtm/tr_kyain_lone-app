@@ -49,7 +49,7 @@ export default function AiQuizStudio({
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(300px,.94fr)]">
         <div className="liquid-panel space-y-4 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" onChange={handleImageSelect} className="hidden"/>
+          <input ref={fileInputRef} type="file" accept="image/*,.pdf" onClick={(e)=>{e.currentTarget.value="";}} onChange={handleImageSelect} className="hidden"/>
           <button type="button" onClick={()=>fileInputRef.current?.click()} className="liquid-dropzone group flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#b9a9f2] bg-gradient-to-r from-[#faf7ff] to-[#f3f5ff] p-4 text-left transition hover:border-[#8068dc] hover:shadow-sm">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#eeeaff] text-[#715cda]"><UploadCloud className="h-6 w-6"/></span>
             <span className="min-w-0 flex-1">
