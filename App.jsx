@@ -43,8 +43,20 @@ import {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey);
+// Route Supabase browser requests through this site's Pages Function. This avoids
+// mobile-browser cross-origin/network failures while keeping the public key client-side.
+const supabaseSameOriginFetch = async (input, init) => {
+  const request = new Request(input, init);
+  const target = new URL(request.url);
+  if (target.origin !== supabaseUrl) return fetch(request);
+  const path = target.pathname.slice(1) + target.search;
+  const proxyUrl = new URL('/api/supabase-proxy', window.location.origin);
+  proxyUrl.searchParams.set('path', path);
+  return fetch(new Request(proxyUrl.toString(), request));
+};
 const supabase = hasSupabaseConfig ? createClient(supabaseUrl, supabasePublishableKey, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  global: { fetch: supabaseSameOriginFetch }
 }) : null;
 
 const LOCAL_KEYS = {
