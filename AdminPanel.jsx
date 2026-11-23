@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, ShieldCheck, LayoutDashboard, CreditCard, Users, Settings2, RefreshCw, CheckCircle2, XCircle, Search, Crown, Clock3, Save, LogOut, ExternalLink, Smartphone, Wallet, Loader2 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'myintaung7432@gmail.com';
@@ -6,7 +7,7 @@ const money = value => new Intl.NumberFormat('en-US').format(Number(value || 0))
 const card = 'rounded-2xl border border-white/80 bg-white/85 p-4 shadow-[0_10px_30px_rgba(57,52,128,.07)] backdrop-blur-xl';
 const field = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
 
-export default function AdminPanel({ supabase, onClose }) {
+export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogout }) {
   const [sessionUser, setSessionUser] = useState(null);
   const [authorized, setAuthorized] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -66,7 +67,7 @@ export default function AdminPanel({ supabase, onClose }) {
     setChecking(false);
   }, [supabase, loadData]);
 
-  useEffect(() => { verifySession(); }, [verifySession]);
+  useEffect(() => {\n    const body = document.body;\n    const previousOverflow = body.style.overflow;\n    const previousOverscroll = body.style.overscrollBehavior;\n    body.style.overflow = 'hidden';\n    body.style.overscrollBehavior = 'none';\n    verifySession();\n    return () => { body.style.overflow = previousOverflow; body.style.overscrollBehavior = previousOverscroll; };\n  }, [verifySession]);
 
   const signIn = async e => {
     e.preventDefault(); setBusy(true); setError('');
@@ -78,8 +79,17 @@ export default function AdminPanel({ supabase, onClose }) {
       setError('ဒီအကောင့်ကို Admin အဖြစ် ခွင့်ပြုမထားပါ။');
       setBusy(false); return;
     }
-    setSessionUser(data.user); setAuthorized(true); setPassword('');
+    setSessionUser(data.user); setAuthorized(true); setPassword(''); onAuthenticated?.();
     await loadData();
+    setBusy(false);
+  };
+
+  const logout = async () => {
+    setBusy(true); setError('');
+    const { error: logoutError } = await supabase.auth.signOut();
+    if (logoutError) { setError(logoutError.message); setBusy(false); return; }
+    setSessionUser(null); setAuthorized(false); setPassword('');
+    onLogout?.();
     setBusy(false);
   };
 
@@ -143,13 +153,16 @@ export default function AdminPanel({ supabase, onClose }) {
   const pendingCount = payments.filter(p => p.status === 'pending').length;
   const activeCount = users.filter(u => ['active','trial','admin_free','grace'].includes(u.subscription_status)).length;
 
-  if (checking) return <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/40 p-4"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>;
+  if (checking) return createPortal(<div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overscroll-y-contain bg-slate-950/40 p-4"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>, document.body);
 
-  return <div className="fixed inset-0 z-[100] overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,#e9e5ff,transparent_40%),linear-gradient(145deg,#f7f8ff,#edf5ff)] text-slate-900">
+  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[radial-gradient(circle_at_top_left,#e9e5ff,transparent_40%),linear-gradient(145deg,#f7f8ff,#edf5ff)] text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
     <div className="mx-auto min-h-[100dvh] w-full min-w-0 max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
       <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/80 p-3 shadow-sm backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500 text-white"><ShieldCheck className="h-5 w-5"/></div><div className="min-w-0"><p className="truncate text-sm font-black">Platform Admin</p><p className="truncate text-[11px] text-slate-500">Tr.Kyain Lone · Secure Console</p></div></div>
-        <button onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold"><ArrowLeft className="mr-1 inline h-4 w-4"/> ပိတ်ရန်</button>
+        <div className="flex shrink-0 items-center gap-2">
+          {authorized && <button onClick={logout} disabled={busy} className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50"><LogOut className="mr-1 inline h-4 w-4"/> Logout</button>}
+          <button onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold"><ArrowLeft className="mr-1 inline h-4 w-4"/> ပိတ်ရန်</button>
+        </div>
       </header>
 
       {!authorized ? <div className="mx-auto mt-10 max-w-md">
@@ -192,5 +205,5 @@ export default function AdminPanel({ supabase, onClose }) {
         <footer className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-400"><ShieldCheck className="h-3.5 w-3.5"/> Admin access is verified by Supabase platform_admins</footer>
       </>}
     </div>
-  </div>;
+  </div>, document.body);
 }
