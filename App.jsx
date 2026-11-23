@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@supabase/supabase-js';
 const SubscriptionCenter = React.lazy(() => import('./SubscriptionCenter.jsx'));
 const TeachingHub = React.lazy(() => import('./TeachingHub.jsx'));
@@ -230,6 +231,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription' | 'teaching'
   const adminLogoTapRef = useRef({ count: 0, at: 0 });
   const [adminOpen, setAdminOpen] = useState(false);
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [toast, setToast] = useState('');
   const [copiedId, setCopiedId] = useState('');
 
@@ -2271,8 +2273,13 @@ export default function App() {
             </button>
           </div>
         </nav>
+        {adminAuthenticated && !adminOpen && (
+          <button type="button" onClick={() => setAdminOpen(true)} className="fixed bottom-[88px] right-4 z-50 rounded-full border border-violet-200 bg-white/95 px-4 py-2.5 text-xs font-extrabold text-violet-700 shadow-lg backdrop-blur-xl">
+            Admin Panel
+          </button>
+        )}
       </div>
-      {adminOpen && <React.Suspense fallback={<div className="fixed inset-0 z-[100] grid place-items-center bg-white/80 text-sm font-bold">Admin Panel ဖွင့်နေသည်...</div>}><AdminPanel supabase={supabase} onClose={() => setAdminOpen(false)} /></React.Suspense>}
+      {adminOpen && <React.Suspense fallback={<div className="fixed inset-0 z-[100] grid place-items-center bg-white/80 text-sm font-bold">Admin Panel ဖွင့်နေသည်...</div>}><AdminPanel supabase={supabase} onAuthenticated={() => setAdminAuthenticated(true)} onLogout={() => { setAdminAuthenticated(false); setAdminOpen(false); }} onClose={() => setAdminOpen(false)} /></React.Suspense>}
     </div>
   );
 }
