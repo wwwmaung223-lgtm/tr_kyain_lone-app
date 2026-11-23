@@ -203,7 +203,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype; v_student_data jsonb;
 begin
   select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code));
@@ -218,7 +218,7 @@ begin
     'answers',v_participant.answers,'participant_status',v_participant.status,'student_name',v_participant.student_name,
     'student_data',v_student_data);
 end;
-$;
+$$;
 
 create or replace function public.save_exam_room_answers(p_join_code text, p_participant_id uuid, p_participant_token uuid, p_answers jsonb, p_submit boolean default false)
 returns jsonb
