@@ -201,7 +201,7 @@ begin
   insert into public.exam_room_participants(room_id,student_name,student_code,status)
   values(v_room.id,left(trim(p_student_name),100),left(nullif(trim(p_student_code),''),50),'joined')
   returning * into v_participant;
-  return jsonb_build_object('participant_id',v_participant.id,'room_id',v_room.id,
+  return jsonb_build_object('participant_id',v_participant.id,'participant_token',v_participant.participant_token,'room_id',v_room.id,
     'quiz_code',v_room.quiz_code,'room_status',v_room.status,'answers',v_participant.answers,
     'participant_status',v_participant.status);
 end;
