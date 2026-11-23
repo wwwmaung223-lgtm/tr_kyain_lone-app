@@ -21,7 +21,7 @@ create or replace function public.grant_teacher_ai_lifetime(p_email text, p_note
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$$
 declare v_user_id uuid;
 begin
@@ -40,7 +40,7 @@ create or replace function public.revoke_teacher_ai_lifetime(p_email text)
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$$
 declare v_user_id uuid;
 begin
@@ -72,7 +72,7 @@ create or replace function public.claim_teacher_device(p_device_id text, p_devic
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$$
 declare v_uid uuid := auth.uid(); v_session uuid; v_existing public.teacher_device_sessions%rowtype;
 begin
@@ -96,7 +96,7 @@ create or replace function public.touch_teacher_device(p_device_id text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$$
 declare v_uid uuid := auth.uid(); v_session uuid := nullif(auth.jwt()->>'session_id','')::uuid;
 begin
@@ -157,7 +157,7 @@ create or replace function public.create_exam_room(p_quiz_code text, p_join_code
 returns uuid
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$$
 declare v_room uuid;
 begin
@@ -176,7 +176,7 @@ create or replace function public.join_exam_room(p_join_code text, p_student_nam
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$$
 declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype;
 begin
@@ -210,7 +210,7 @@ create or replace function public.save_exam_room_answers(p_join_code text, p_par
 returns jsonb
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = ''
 as $$
 declare v_room_id uuid;
 begin
