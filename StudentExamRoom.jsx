@@ -36,6 +36,23 @@ export default function StudentExamRoom({ supabase, joinCode }) {
     return()=>{active=false;};
   },[supabase,joinCode]);
 
+  // Refresh room state while the student is in the exam so a teacher ending the room locks the UI promptly.
+  useEffect(()=>{
+    if(!participant?.participant_id||!supabase||!joinCode)return;
+    let active=true;
+    const refreshRoom=async()=>{
+      const {data,error:refreshError}=await supabase.rpc('resume_exam_room',{
+        p_join_code:String(joinCode).trim().toUpperCase(),
+        p_participant_id:participant.participant_id,
+        p_participant_token:participant.participant_token
+      });
+      if(!active||refreshError||!data)return;
+      setParticipant(current=>current?({...current,room_status:data.room_status,participant_status:data.participant_status}):current);
+    };
+    const timer=window.setInterval(refreshRoom,8000);
+    return()=>{active=false;window.clearInterval(timer);};
+  },[supabase,joinCode,participant?.participant_id,participant?.participant_token]);
+
   const join=async e=>{
     e.preventDefault();setBusy(true);setError('');setNotice('');
     try{
