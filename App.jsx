@@ -1047,7 +1047,7 @@ export default function App() {
         {/* ==================================================================
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
+        <main className="flex-1 w-full min-w-0 max-w-5xl mx-auto overflow-x-clip px-3 sm:px-4 md:px-8 pt-2 pb-28 space-y-4">
           {activeTab === 'teaching' && teacherAccount ? (
             <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading Teaching Hub…</div>}>
               <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
