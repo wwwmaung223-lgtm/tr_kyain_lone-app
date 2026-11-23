@@ -112,14 +112,16 @@ export async function onRequest({ request, env }) {
   let settings = {};
   for (const line of String(customInstruction).split('\n')) {
     const idx = line.indexOf(':');
-    if (idx < 0) continue;
+    if (idx < 0) {
+      if (/^generate approximately/i.test(line.trim())) settings.count = parseInt(line.match(/\\d+/)?.[0] || '10', 10);
+      continue;
+    }
     const label = line.slice(0, idx).trim().toLowerCase();
     const value = line.slice(idx + 1).trim();
     if (label === 'subject') settings.subject = value;
     if (label === 'grade') settings.grade = value;
     if (label === 'difficulty') settings.difficulty = value;
     if (label === 'question type') settings.questionType = value;
-    if (/^generate approximately/i.test(line.trim())) settings.count = parseInt(line.match(/\\d+/)?.[0] || '10', 10);
     if (label === 'language') settings.language = value;
   }
   const requestedCount = Math.max(1, Math.min(30, Number(settings.count) || 10));
