@@ -29,8 +29,8 @@ async function pickModels(key) {
     }).sort((a, b) => b.rank - a.rank).map(x => x.name);
 }
 async function verifyTeacher(env, token) {
-  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
-  const key = env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const url = env.SUPABASE_URL || env.VITE_SUPABASE_URL || 'https://esoekjjwsbtuyjkrbnam.supabase.co';
+  const key = env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_WE3HWB-BDEor5QgfPpoNxg_K8PLd6_T';
   if (!url || !key || !token || typeof token !== 'string') return false;
   try {
     const r = await fetch(`${url}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
