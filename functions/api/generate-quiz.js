@@ -113,7 +113,7 @@ export async function onRequest({ request, env }) {
   for (const line of String(customInstruction).split('\n')) {
     const idx = line.indexOf(':');
     if (idx < 0) {
-      if (/^generate approximately/i.test(line.trim())) settings.count = parseInt(line.match(/\\d+/)?.[0] || '10', 10);
+      if (/^generate approximately/i.test(line.trim())) settings.count = parseInt(line.match(/[0-9]+/)?.[0] || '10', 10);
       continue;
     }
     const label = line.slice(0, idx).trim().toLowerCase();
@@ -129,24 +129,24 @@ export async function onRequest({ request, env }) {
   if (!models.length) return json({ success: false, error: 'Gemini model စာရင်း မရပါ။ API Key သို့မဟုတ် API quota ကို စစ်ဆေးပါ။' }, 502);
 
   const imagePart = { inline_data: { mime_type: mimeType, data: base64Data } };
-  const prompt = \`You are a multimodal OCR specialist, experienced school teacher, assessment designer and answer-key verifier.
+  const prompt = `You are a multimodal OCR specialist, experienced school teacher, assessment designer and answer-key verifier.
 First read the uploaded worksheet/photo/PDF page carefully. Internally transcribe the source in reading order, identify its topic, facts, examples, formulas, exercises and any printed answer choices. Then create a classroom-ready quiz grounded ONLY in that uploaded source.
 
 TEACHER SETTINGS:
-Subject: \${settings.subject || 'Infer from source'}
-Grade: \${settings.grade || 'Appropriate to source'}
-Difficulty: \${settings.difficulty || 'Balanced'}
-Question format: \${settings.questionType || 'Mixed questions'}
-Requested number: \${requestedCount}
-Language: \${settings.language || 'Preserve source language'}
-Additional instruction: \${String(customInstruction).slice(0, 700)}
+Subject: ${settings.subject || 'Infer from source'}
+Grade: ${settings.grade || 'Appropriate to source'}
+Difficulty: ${settings.difficulty || 'Balanced'}
+Question format: ${settings.questionType || 'Mixed questions'}
+Requested number: ${requestedCount}
+Language: ${settings.language || 'Preserve source language'}
+Additional instruction: ${String(customInstruction).slice(0, 700)}
 
 Return ONLY valid JSON using this schema:
 {"title":"short title","description":"student instruction","sourceText":"faithful concise transcription of the key source content","uncertainParts":["unreadable or ambiguous parts"],"questions":[{"type":"mcq or written","text":"complete question","marks":1,"options":["choice A","choice B","choice C","choice D"],"correctOption":0}]}
 
 QUALITY RULES:
 - Read the actual uploaded material, not the sample quiz or assumed subject. Preserve important terminology, formulas, units, names and facts.
-- Generate up to \${requestedCount} useful questions. If the source does not support that many, return fewer rather than inventing content.
+- Generate up to ${requestedCount} useful questions. If the source does not support that many, return fewer rather than inventing content.
 - If the source is an existing worksheet/question paper, preserve its tested skills and key wording. Do not silently change what is being tested.
 - If the source is lesson notes/textbook material, create new questions that test the key ideas actually present in it.
 - Use a balanced progression of recall, understanding and application appropriate to grade and difficulty.
@@ -156,7 +156,7 @@ QUALITY RULES:
 - Avoid duplicate, vague, trick or ambiguous questions. Each question must be self-contained.
 - If Myanmar + English is selected, provide clear natural bilingual wording while preserving technical meaning.
 - Do not claim OCR certainty for blurry text. Put unclear sections in uncertainParts.
-- Output JSON only; no markdown fences or commentary.\`;
+- Output JSON only; no markdown fences or commentary.`;
   let result;
   let generationError;
   for (const model of models.slice(0, 2)) {
@@ -175,7 +175,7 @@ QUALITY RULES:
       ? 'Gemini Free quota ပြည့်နေပါတယ်။ ခဏနားပြီး ပြန်စမ်းပါ။'
       : aborted
         ? 'AI က အချိန်မီ မတုံ့ပြန်နိုင်ပါ။ ပုံအရွယ်အစားကို 3MB အောက်ထားပြီး စာမျက်နှာတစ်မျက်နှာချင်း တင်ပေးပါ။'
-        : \`AI မေးခွန်းဖန်တီးမှု မအောင်မြင်ပါ: \${generationError?.message || 'Unknown error'}\` }, 502);
+        : `AI မေးခွန်းဖန်တီးမှု မအောင်မြင်ပါ: ${generationError?.message || 'Unknown error'}` }, 502);
   }
   const sourceText = String(result.sourceText || '').trim();
   const uncertainParts = Array.isArray(result.uncertainParts) ? result.uncertainParts : [];
@@ -191,7 +191,7 @@ QUALITY RULES:
   const missingKeys = questions.filter(q => q.type === 'mcq' && q.correctOption === null).length;
   return json({
     success: true,
-    title: String(result.title || extracted.document_title || 'AI Generated Quiz'),
+    title: String(result.title || 'AI Generated Quiz'),
     description: String(result.description || ''),
     questions,
     diagnostics: {
