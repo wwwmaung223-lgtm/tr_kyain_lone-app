@@ -37,7 +37,7 @@ export default function AiQuizStudio({
   const label = 'mb-1.5 block text-[11px] font-bold text-[#535779]';
 
   return (
-    <section className="liquid-studio rounded-[26px] border border-white bg-gradient-to-br from-white via-[#fbfaff] to-[#f4f5ff] p-4 shadow-[0_18px_44px_rgba(86,77,180,.10)] sm:p-5">
+    <section className="liquid-studio w-full min-w-0 max-w-full overflow-hidden rounded-[26px] border border-white bg-gradient-to-br from-white via-[#fbfaff] to-[#f4f5ff] p-3 shadow-[0_18px_44px_rgba(86,77,180,.10)] sm:p-5">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="mb-1 text-[10px] font-extrabold tracking-[.16em] text-[#8068dc]">TEACHER WORKSPACE / AI STUDIO</p>
@@ -47,8 +47,8 @@ export default function AiQuizStudio({
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e4defe] bg-[#f0edff] px-3 py-2 text-[9px] font-extrabold tracking-wide text-[#6d57cf]"><Sparkles className="h-3.5 w-3.5"/> AI ASSISTED</span>
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(300px,.94fr)]">
-        <div className="liquid-panel space-y-4 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
+      <div className="grid w-full min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.06fr)_minmax(300px,.94fr)]">
+        <div className="liquid-panel min-w-0 w-full space-y-4 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
           <input ref={fileInputRef} type="file" accept="image/*,.pdf" onClick={(e)=>{e.currentTarget.value="";}} onChange={handleImageSelect} className="hidden"/>
           <button type="button" onClick={()=>fileInputRef.current?.click()} className="liquid-dropzone group flex w-full items-center gap-3 rounded-2xl border border-dashed border-[#b9a9f2] bg-gradient-to-r from-[#faf7ff] to-[#f3f5ff] p-4 text-left transition hover:border-[#8068dc] hover:shadow-sm">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#eeeaff] text-[#715cda]"><UploadCloud className="h-6 w-6"/></span>
@@ -92,7 +92,7 @@ export default function AiQuizStudio({
           <p className="text-[10px] leading-4 text-[#9699ae]">AI-generated questions should be reviewed by the teacher before publishing.</p>
         </div>
 
-        <aside className="liquid-panel space-y-3 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
+        <aside className="liquid-panel min-w-0 w-full space-y-3 rounded-[20px] border border-[#eceaf6] bg-white p-3.5 sm:p-4">
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-[9px] font-extrabold tracking-[.15em] text-[#8068dc]">LIVE PREVIEW</p><h3 className="mt-1 text-[15px] font-extrabold text-[#292b50]">{quizTitle || 'Untitled quiz'}</h3><p className="mt-1 text-[10px] text-[#8589a2]">{subject} · {grade} · {difficulty}</p></div>
             <span className="rounded-xl bg-[#efedff] px-2.5 py-2 text-[10px] font-extrabold text-[#6855d2]">{questions.length} Q</span>
