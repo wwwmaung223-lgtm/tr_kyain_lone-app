@@ -3,8 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle2, Clock3, CreditCard, ImagePlus, Loader2, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 
 const ADMIN_EMAIL = 'myintaung7432@gmail.com';
-const KPay = { name: 'Myint Aung', phone: '09791990867' };
-const PLANS = [
+const DEFAULT_KPAY = { name: 'Myint Aung', phone: '09791990867', qr_payload: 'hQZLQlpQYXlhQE8C8FACEFECMTFXFgl5GZCGfSYREBAfnwgEAQGfJAEwFE1a1d57aaa52' };
+const FALLBACK_PLANS = [
   { code: 'monthly', label: '1 လ', days: 30, price: 8500, discount: 0 },
   { code: 'quarterly', label: '3 လ', days: 90, price: 22950, discount: 10 },
   { code: 'half_year', label: '6 လ', days: 180, price: 40800, discount: 20 },
@@ -14,6 +14,8 @@ const money = n => new Intl.NumberFormat('en-US').format(n) + ' Ks';
 
 export default function SubscriptionCenter({ supabase, user, onClose }) {
   const [subscription, setSubscription] = useState(null);
+  const [plans, setPlans] = useState(FALLBACK_PLANS);
+  const [paymentAccount, setPaymentAccount] = useState(DEFAULT_KPAY);
   const [payments, setPayments] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [last6, setLast6] = useState('');
@@ -25,18 +27,22 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
   const [admin, setAdmin] = useState(false);
   const [signedReceipts, setSignedReceipts] = useState({});
 
-  const selected = useMemo(() => PLANS.find(p => p.code === selectedPlan) || PLANS[0], [selectedPlan]);
+  const selected = useMemo(() => plans.find(p => p.code === selectedPlan) || plans[0] || FALLBACK_PLANS[0], [selectedPlan, plans]);
 
   const refresh = async () => {
     if (!supabase || !user) return;
     setLoading(true); setError('');
-    const [sr, pr] = await Promise.all([
+    const [sr, pr, planResult, accountResult] = await Promise.all([
       supabase.from('teacher_subscriptions').select('*').eq('user_id', user.id).maybeSingle(),
-      supabase.from('payment_requests').select('*').order('created_at', { ascending: false })
+      supabase.from('payment_requests').select('*').order('created_at', { ascending: false }),
+      supabase.from('teacher_plan_prices').select('*').eq('is_active', true).order('sort_order'),
+      supabase.from('platform_payment_accounts').select('*').eq('is_active', true).order('updated_at', { ascending: false }).limit(1).maybeSingle()
     ]);
     if (sr.error) setError(sr.error.message);
     else setSubscription(sr.data);
     if (!pr.error) setPayments(pr.data || []);
+    if (!planResult.error && planResult.data?.length) setPlans(planResult.data);
+    if (!accountResult.error && accountResult.data) setPaymentAccount({name:accountResult.data.account_name,phone:accountResult.data.account_number,method:accountResult.data.method_name,qr_payload:accountResult.data.qr_payload,qr_image_url:accountResult.data.qr_image_url,instructions:accountResult.data.instructions});
     setLoading(false);
   };
 
@@ -129,7 +135,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
     <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-indigo-600"/><h3 className="font-extrabold">သင့် Plan ကို ရွေးချယ်ပါ</h3></div>
       <div className="grid grid-cols-2 gap-2">
-        {PLANS.map(p => <button key={p.code} onClick={() => setSelectedPlan(p.code)} className={'text-left rounded-2xl p-3 border transition ' + (selectedPlan === p.code ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 bg-white')}>
+        {plans.map(p => <button key={p.code} onClick={() => setSelectedPlan(p.code)} className={'text-left rounded-2xl p-3 border transition ' + (selectedPlan === p.code ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100' : 'border-slate-200 bg-white')}>
           <p className="font-extrabold">{p.label}</p><p className="text-lg font-black text-indigo-700">{money(p.price)}</p>
           {p.discount > 0 && <p className="text-[11px] text-emerald-700 font-bold">{p.discount}% Discount</p>}
           <p className="text-[10px] text-slate-500">{p.days} ရက် အသုံးပြုခွင့်</p>
@@ -140,8 +146,8 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
     <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-emerald-600"/><h3 className="font-extrabold">KPay ဖြင့် ငွေပေးချေပါ</h3></div>
       <div className="rounded-2xl bg-slate-50 border p-3 flex gap-3 items-center">
-        <div className="w-28 h-28 rounded-xl bg-white border p-1 flex items-center justify-center"><QRCodeSVG value="hQZLQlpQYXlhQE8C8FACEFECMTFXFgl5GZCGfSYREBAfnwgEAQGfJAEwFE1a1d57aaa52" size={100} level="H" includeMargin /></div>
-        <div className="min-w-0"><p className="text-xs text-slate-500">ငွေလက်ခံသူ</p><p className="font-extrabold">{KPay.name}</p><p className="text-sm font-bold">{KPay.phone}</p><p className="text-xs text-indigo-700 font-bold">ပေးချေရမည့်ငွေ: {money(selected.price)}</p></div>
+        <div className="w-28 h-28 rounded-xl bg-white border p-1 flex items-center justify-center">{paymentAccount?.qr_image_url ? <img src={paymentAccount.qr_image_url} alt="Payment QR" className="h-24 w-24 object-contain"/> : <QRCodeSVG value={paymentAccount?.qr_payload || DEFAULT_KPAY.qr_payload} size={100} level="H" includeMargin />}</div>
+        <div className="min-w-0"><p className="text-xs text-slate-500">ငွေလက်ခံသူ</p><p className="font-extrabold">{paymentAccount?.name || DEFAULT_KPAY.name}</p><p className="text-sm font-bold">{paymentAccount?.phone || DEFAULT_KPAY.phone}</p><p className="text-xs text-indigo-700 font-bold">ပေးချေရမည့်ငွေ: {money(selected.price)}</p></div>
       </div>
       <form onSubmit={submitPayment} className="space-y-3">
         <label className="block text-xs font-bold text-slate-600">ပြေစာဓာတ်ပုံ (JPEG / PNG / WebP, 5MB အောက်)</label>
@@ -158,7 +164,7 @@ export default function SubscriptionCenter({ supabase, user, onClose }) {
     <section className="rounded-3xl bg-white/90 border border-white p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between"><h3 className="font-extrabold">Payment History</h3><button onClick={refresh} className="text-xs text-indigo-700 flex items-center gap-1"><RefreshCw className="w-3 h-3"/> Refresh</button></div>
       {visiblePayments.length === 0 ? <p className="text-sm text-slate-500">Payment မှတ်တမ်း မရှိသေးပါ။</p> : visiblePayments.map(p => <div key={p.id} className="rounded-xl border border-slate-200 p-3 flex items-center justify-between gap-2">
-        <div><p className="text-sm font-bold">{PLANS.find(x => x.code === p.plan_code)?.label} · {money(p.amount_mmk)}</p><p className="text-[11px] text-slate-500">Code: {p.transaction_last6} · {new Date(p.created_at).toLocaleString()}</p></div>
+        <div><p className="text-sm font-bold">{plans.find(x => x.code === p.plan_code)?.label} · {money(p.amount_mmk)}</p><p className="text-[11px] text-slate-500">Code: {p.transaction_last6} · {new Date(p.created_at).toLocaleString()}</p></div>
         <span className={'text-xs font-bold ' + (p.status === 'approved' ? 'text-emerald-700' : p.status === 'rejected' ? 'text-rose-600' : 'text-amber-700')}>{p.status}</span>
       </div>)}
     </section>
