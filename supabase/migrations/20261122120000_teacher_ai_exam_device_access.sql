@@ -12,6 +12,7 @@ create table if not exists public.teacher_ai_lifetime_grants (
 create unique index if not exists teacher_ai_lifetime_grants_one_active
   on public.teacher_ai_lifetime_grants(user_id) where revoked_at is null;
 alter table public.teacher_ai_lifetime_grants enable row level security;
+grant select on public.teacher_ai_lifetime_grants to authenticated;
 drop policy if exists "Users can view own active AI lifetime grant" on public.teacher_ai_lifetime_grants;
 create policy "Users can view own active AI lifetime grant"
   on public.teacher_ai_lifetime_grants for select to authenticated
@@ -63,6 +64,7 @@ create table if not exists public.teacher_device_sessions (
   updated_at timestamptz not null default now()
 );
 alter table public.teacher_device_sessions enable row level security;
+grant select on public.teacher_device_sessions to authenticated;
 drop policy if exists "Teachers can view own device session" on public.teacher_device_sessions;
 create policy "Teachers can view own device session"
   on public.teacher_device_sessions for select to authenticated
