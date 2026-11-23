@@ -49,7 +49,7 @@ const supabaseSameOriginFetch = async (input, init) => {
   const request = new Request(input, init);
   const target = new URL(request.url);
   if (target.origin !== supabaseUrl) return fetch(request);
-  const path = target.pathname.replace(/^\\/+/, '') + target.search;
+  const path = target.pathname.slice(1) + target.search;
   const proxyUrl = new URL('/api/supabase-proxy', window.location.origin);
   proxyUrl.searchParams.set('path', path);
   return fetch(new Request(proxyUrl.toString(), request));
