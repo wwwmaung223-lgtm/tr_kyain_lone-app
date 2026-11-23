@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ShieldCheck, LayoutDashboard, CreditCard, Users, Settings2, RefreshCw, CheckCircle2, XCircle, Search, Crown, Clock3, Save, LogOut, ExternalLink, Smartphone, Wallet, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, LayoutDashboard, CreditCard, Users, Settings2, CheckCircle2, XCircle, Search, Crown, Clock3, Save, LogOut, ExternalLink, Smartphone, Wallet, Loader2 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'myintaung7432@gmail.com';
 const money = value => new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Ks';
@@ -199,8 +199,6 @@ export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogou
         </nav>
         {error && <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
         {notice && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{notice}</div>}
-        <div className="mb-3 flex justify-end"><button onClick={loadData} disabled={busy} className="rounded-xl border border-white bg-white px-3 py-2 text-xs font-bold text-slate-600"><RefreshCw className={'mr-1 inline h-3.5 w-3.5 '+(busy?'animate-spin':'')}/> Refresh</button></div>
-
         {tab==='overview' && <div className="grid gap-3 md:grid-cols-2">
           <section className={card}><h2 className="font-extrabold">Recent payments</h2>{payments.slice(0,5).map(p=><div key={p.id} className="flex items-center justify-between gap-2 border-b border-slate-100 py-3 last:border-0"><div className="min-w-0"><p className="truncate text-xs font-bold">{users.find(u=>u.user_id===p.user_id)?.email||p.user_id}</p><p className="text-[10px] text-slate-500">{p.plan_code} · {money(p.amount_mmk)}</p></div><span className="shrink-0 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold">{p.status}</span></div>)}{!payments.length&&<p className="py-5 text-center text-xs text-slate-500">Payment မရှိသေးပါ။</p>}</section>
           <section className={card}><h2 className="font-extrabold">Quick actions</h2><div className="mt-3 grid gap-2"><button onClick={()=>setTab('plans')} className="rounded-xl bg-violet-50 p-3 text-left text-xs font-bold text-violet-800"><CreditCard className="mr-2 inline h-4 w-4"/> Plan ဈေးနှုန်း ပြင်ရန်</button><button onClick={()=>setTab('payments')} className="rounded-xl bg-emerald-50 p-3 text-left text-xs font-bold text-emerald-800"><Wallet className="mr-2 inline h-4 w-4"/> Payment ပြေစာ စစ်ရန်</button><button onClick={()=>setTab('accounts')} className="rounded-xl bg-sky-50 p-3 text-left text-xs font-bold text-sky-800"><Users className="mr-2 inline h-4 w-4"/> User Free Access သတ်မှတ်ရန်</button><button onClick={()=>setTab('payment-account')} className="rounded-xl bg-amber-50 p-3 text-left text-xs font-bold text-amber-800"><Settings2 className="mr-2 inline h-4 w-4"/> ငွေလက်ခံအကောင့် ပြင်ရန်</button></div></section>
