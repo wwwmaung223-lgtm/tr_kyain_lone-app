@@ -219,6 +219,9 @@ export default function App() {
   const [registerName, setRegisterName] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   // Navigation & Global UI Feedback
   const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription' | 'teaching'
@@ -357,7 +360,7 @@ export default function App() {
     setMyQuizzes(Object.values(localQuizzes));setAllSubmissions(Object.values(readLocalMap(LOCAL_KEYS.SUBMISSIONS)));
     if(!supabase){setAuthReady(true);return;}
     supabase.auth.getSession().then(({data})=>{const user=data?.session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);}).catch(()=>setAuthReady(true));
-    const {data:authListener}=supabase.auth.onAuthStateChange((_event,session)=>{const user=session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);});
+    const {data:authListener}=supabase.auth.onAuthStateChange((event,session)=>{if(event==='PASSWORD_RECOVERY'){setPasswordRecovery(true);setActiveTab('creator');setAuthError('');}const user=session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);});
     return()=>authListener.subscription.unsubscribe();
   },[]);
 
@@ -495,6 +498,8 @@ export default function App() {
     try{let result;if(authMode==='register'){const displayName=registerName.trim()||email.split('@')[0];result=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName}}});}else result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(!result.data?.user)throw new Error('အကောင့်အတည်ပြုရန် Email ကို စစ်ဆေးပါ။');if(authMode==='register'&&!result.data.session)throw new Error('Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပြီးမှ Login ဝင်ပါ။');const user=result.data.user,displayName=user.user_metadata?.display_name||email.split('@')[0];completeTeacherLogin({email,displayName,uid:user.id},authMode==='register'?`အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`:`ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);}
     catch(err){const messages={'User already registered':'ဤ Gmail ဖြင့် အကောင့်ဖွင့်ပြီးသားပါ။ Login ဝင်ပါ။','Invalid login credentials':'Gmail သို့မဟုတ် Password မှားနေပါသည်။','Email not confirmed':'Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပါ။'};setAuthError(messages[err.message]||err.message||'အကောင့်ဝင်ရာတွင် အခက်အခဲရှိပါသည်။');}finally{setIsAuthLoading(false);}
   };
+  const handlePasswordResetRequest=async()=>{setAuthError('');const email=loginEmail.trim().toLowerCase();if(!supabase){setAuthError('Supabase ချိတ်ဆက်မှု မရှိသေးပါ။');return;}if(!email||!email.includes('@')){setAuthError('Password ပြန်သတ်မှတ်ရန် Gmail လိပ်စာ ထည့်ပါ။');return;}setIsAuthLoading(true);try{const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${window.location.origin}/`});if(error)throw error;setAuthError('Password ပြန်သတ်မှတ်ရန် လင့်ခ်ကို Gmail သို့ ပို့ပြီးပါပြီ။ Inbox နှင့် Spam ကို စစ်ဆေးပါ။');}catch(err){setAuthError(err.message||'Password reset email ပို့မရပါ။');}finally{setIsAuthLoading(false);}};
+  const handlePasswordRecoverySubmit=async(e)=>{e.preventDefault();setAuthError('');if(newPassword.length<8){setAuthError('Password အသစ် အနည်းဆုံး ၈ လုံး ထည့်ပါ။');return;}if(newPassword!==confirmNewPassword){setAuthError('Password အသစ်နှစ်ခု မတူပါ။');return;}setIsAuthLoading(true);try{const {error}=await supabase.auth.updateUser({password:newPassword});if(error)throw error;setPasswordRecovery(false);setNewPassword('');setConfirmNewPassword('');setLoginPassword('');notify('Password အသစ် ပြောင်းပြီးပါပြီ။');}catch(err){setAuthError(err.message||'Password ပြောင်းလဲမရပါ။');}finally{setIsAuthLoading(false);}};
   const handleTeacherLogout=async()=>{try{if(supabase)await supabase.auth.signOut();}catch(err){console.warn('Sign out:',err);}setTeacherAccount(null);setFbUser(null);setLoginPassword('');setGeneratedQuizLink('');setGeneratedQuizCode('');notify('အကောင့်မှ ထွက်လိုက်ပါပြီ');};
 
   // 5. AI PHOTO-TO-QUIZ HANDLERS
@@ -999,7 +1004,7 @@ export default function App() {
     );
   }, [teacherSubmissions, searchQuery]);
 
-  const showTeacherAuthGate = (activeTab === 'creator' || activeTab === 'dashboard') && !teacherAccount;
+  const showTeacherAuthGate = !teacherAccount && activeTab !== 'student';
 
   const displayWorksheetImg = activeQuiz?.worksheetImage || (activeQuiz?.code === generatedQuizCode ? worksheetImage : '');
 
@@ -1203,7 +1208,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <form onSubmit={handleTeacherAuthSubmit} className="space-y-3">
+                <form onSubmit={passwordRecovery ? handlePasswordRecoverySubmit : handleTeacherAuthSubmit} className="space-y-3">
                   {authMode === 'register' && (
                     <div>
                       <label className="block text-[11px] font-bold text-slate-700 mb-1">
@@ -1238,7 +1243,19 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div>
+                  {passwordRecovery ? (
+                    <>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Password အသစ်</label>
+                        <input type="password" autoComplete="new-password" value={newPassword} onChange={(e)=>setNewPassword(e.target.value)} placeholder="အနည်းဆုံး ၈ လုံး" className="w-full px-3.5 py-3 rounded-2xl bg-white/90 border border-slate-200 text-xs font-semibold text-slate-900 outline-none focus:border-indigo-500" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Password အသစ် ထပ်ထည့်ပါ</label>
+                        <input type="password" autoComplete="new-password" value={confirmNewPassword} onChange={(e)=>setConfirmNewPassword(e.target.value)} placeholder="Password အသစ်ကို ထပ်ရိုက်ပါ" className="w-full px-3.5 py-3 rounded-2xl bg-white/90 border border-slate-200 text-xs font-semibold text-slate-900 outline-none focus:border-indigo-500" />
+                      </div>
+                    </>
+                  ) : (
+                                      <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       ကိုယ်ပိုင်စကားဝှက် (Password)
                     </label>
@@ -1253,6 +1270,7 @@ export default function App() {
                       />
                     </div>
                   </div>
+                  )}
 
                   {authError && (
                     <p className="text-[11px] font-bold text-rose-600 bg-rose-50/95 px-3 py-2 rounded-xl border border-rose-200/70">
@@ -1260,6 +1278,14 @@ export default function App() {
                     </p>
                   )}
 
+                  {!passwordRecovery && authMode === 'login' && (
+                    <div className="text-right -mt-1">
+                      <button type="button" onClick={handlePasswordResetRequest} disabled={isAuthLoading} className="text-[11px] font-bold text-indigo-700 underline underline-offset-2 disabled:opacity-50">Password မေ့နေပါသလား?</button>
+                    </div>
+                  )}
+                  {passwordRecovery && (
+                    <button type="button" onClick={()=>{setPasswordRecovery(false);setNewPassword('');setConfirmNewPassword('');setAuthError('');}} className="w-full text-[11px] font-bold text-slate-600">Login သို့ ပြန်သွားမည်</button>
+                  )}
                   <button
                     type="submit"
                     disabled={isAuthLoading}
@@ -1274,9 +1300,7 @@ export default function App() {
                       <>
                         <KeyRound className="w-4 h-4" />
                         <span>
-                          {authMode === 'login'
-                            ? 'Gmail ဖြင့် အကောင့်ဝင်မည်'
-                            : 'အကောင့်အသစ် ဖွင့်ပြီး ဝင်မည်'}
+                          {passwordRecovery ? 'Password အသစ် သိမ်းမည်' : authMode === 'login' ? 'Gmail ဖြင့် အကောင့်ဝင်မည်' : 'အကောင့်အသစ် ဖွင့်ပြီး ဝင်မည်'}
                         </span>
                       </>
                     )}
