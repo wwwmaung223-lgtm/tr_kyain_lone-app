@@ -46,7 +46,8 @@ function cleanQuestions(raw) {
   }).filter(Boolean);
 }
 export async function onRequest({ request, env }) {
-  const key=env.GEMINI_API_KEY;
+  // Accept the original Pages secret name used in the dashboard as well as the canonical name.
+  const key=env.GEMINI_API_KEY || env.GEMINI_APT_KEY;
   if(request.method==='GET') return json({key_set:!!key,supabase_configured:!!((env.SUPABASE_URL||env.VITE_SUPABASE_URL)&&(env.SUPABASE_PUBLISHABLE_KEY||env.VITE_SUPABASE_PUBLISHABLE_KEY))});
   if(request.method!=='POST')return json({success:false,error:'POST only'},405);
   if(!key)return json({success:false,error:'GEMINI_API_KEY ကို Cloudflare Pages Secret ထဲ မထည့်ရသေးပါ'},500);
