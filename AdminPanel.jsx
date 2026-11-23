@@ -161,9 +161,9 @@ export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogou
   const pendingCount = payments.filter(p => p.status === 'pending').length;
   const activeCount = users.filter(u => ['active','trial','admin_free','grace'].includes(u.subscription_status)).length;
 
-  if (checking) return createPortal(<div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overscroll-y-contain bg-slate-950/40 p-4"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>, document.body);
+  if (checking) return createPortal(<div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overscroll-y-contain bg-slate-950/35 p-4 backdrop-blur-lg"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>, document.body);
 
-  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-[radial-gradient(circle_at_top_left,#e9e5ff,transparent_40%),linear-gradient(145deg,#f7f8ff,#edf5ff)] text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-950/30 backdrop-blur-lg text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
     <div className="mx-auto min-h-[100dvh] w-full min-w-0 max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
       <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/80 p-3 shadow-sm backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500 text-white"><ShieldCheck className="h-5 w-5"/></div><div className="min-w-0"><p className="truncate text-sm font-black">Platform Admin</p><p className="truncate text-[11px] text-slate-500">Tr.Kyain Lone · Secure Console</p></div></div>
