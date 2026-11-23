@@ -13,6 +13,31 @@ export default function StudentExamRoom({ supabase, joinCode }) {
 
   useEffect(()=>{ if(!supabase) setError('စာမေးပွဲဝန်ဆောင်မှုကို ချိတ်ဆက်မရပါ။'); },[supabase]);
 
+  useEffect(()=>{
+    let active=true;
+    const resume=async()=>{
+      if(!supabase||!joinCode)return;
+      try{
+        const saved=JSON.parse(sessionStorage.getItem('exam-room:'+String(joinCode).toUpperCase())||'null');
+        if(!saved?.participant_id||!saved?.participant_token)return;
+        const {data,error:resumeError}=await supabase.rpc('resume_exam_room',{
+          p_join_code:String(joinCode).trim().toUpperCase(),
+          p_participant_id:saved.participant_id,
+          p_participant_token:saved.participant_token
+        });
+        if(resumeError)throw resumeError;
+        const {data:quizRow,error:quizError}=await supabase.from('quiz_assessments').select('quiz_data').eq('code',data.quiz_code).single();
+        if(quizError)throw quizError;
+        if(!active)return;
+        setName(data.student_name||saved.student_name||'');
+        setStudentCode(saved.student_code||'');
+        setParticipant(data);setAnswers(data.answers||{});setQuiz(quizRow.quiz_data);
+      }catch(err){sessionStorage.removeItem('exam-room:'+String(joinCode).toUpperCase());}
+    };
+    resume();
+    return()=>{active=false;};
+  },[supabase,joinCode]);
+
   const join=async e=>{
     e.preventDefault();setBusy(true);setError('');setNotice('');
     try{
