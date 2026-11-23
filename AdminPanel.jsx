@@ -4,7 +4,7 @@ import { ArrowLeft, ShieldCheck, LayoutDashboard, CreditCard, Users, Settings2, 
 
 const ADMIN_EMAIL = 'myintaung7432@gmail.com';
 const money = value => new Intl.NumberFormat('en-US').format(Number(value || 0)) + ' Ks';
-const card = 'rounded-2xl border border-white/80 bg-white p-4 shadow-[0_10px_30px_rgba(57,52,128,.07)]';
+const card = 'rounded-2xl border border-white/70 bg-white/65 p-4 shadow-[0_10px_30px_rgba(57,52,128,.07)] backdrop-blur-2xl';
 const field = 'w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
 
 export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogout }) {
@@ -163,8 +163,9 @@ export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogou
 
   if (checking) return createPortal(<div className="fixed inset-0 z-[100] grid h-[100dvh] w-screen place-items-center overscroll-y-contain bg-slate-950/35 p-4 backdrop-blur-lg"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>, document.body);
 
-  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-950/55 backdrop-blur-2xl text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
-    <div className="mx-auto min-h-[100dvh] w-full min-w-0 max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
+  return createPortal(<div className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-x-hidden overflow-y-auto overscroll-y-contain bg-transparent text-slate-900" style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}>
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_12%_8%,rgba(196,181,253,.72),transparent_42%),radial-gradient(ellipse_at_88%_88%,rgba(125,211,252,.48),transparent_46%),linear-gradient(145deg,#dbeafe_0%,#e9d5ff_48%,#c7d2fe_100%)]"/>
+    <div className="relative z-10 mx-auto min-h-[100dvh] w-full min-w-0 max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
       <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white p-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500 text-white"><ShieldCheck className="h-5 w-5"/></div><div className="min-w-0"><p className="truncate text-sm font-black">Platform Admin</p><p className="truncate text-[11px] text-slate-500">Tr.Kyain Lone · Secure Console</p></div></div>
         <div className="flex shrink-0 items-center gap-2">
