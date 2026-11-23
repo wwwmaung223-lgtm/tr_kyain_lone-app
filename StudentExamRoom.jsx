@@ -26,12 +26,10 @@ export default function StudentExamRoom({ supabase, joinCode }) {
           p_participant_token:saved.participant_token
         });
         if(resumeError)throw resumeError;
-        const {data:quizRow,error:quizError}=await supabase.from('quiz_assessments').select('quiz_data').eq('code',data.quiz_code).single();
-        if(quizError)throw quizError;
         if(!active)return;
         setName(data.student_name||saved.student_name||'');
         setStudentCode(saved.student_code||'');
-        setParticipant(data);setAnswers(data.answers||{});setQuiz(quizRow.quiz_data);
+        setParticipant(data);setAnswers(data.answers||{});setQuiz(data.student_data);
       }catch(err){sessionStorage.removeItem('exam-room:'+String(joinCode).toUpperCase());}
     };
     resume();
@@ -47,10 +45,8 @@ export default function StudentExamRoom({ supabase, joinCode }) {
         p_student_code:studentCode.trim()||null
       });
       if(joinError)throw joinError;
-      const {data:quizRow,error:quizError}=await supabase.from('quiz_assessments').select('quiz_data').eq('code',data.quiz_code).single();
-      if(quizError)throw quizError;
-      if(!quizRow?.quiz_data?.questions?.length)throw new Error('မေးခွန်းစာရင်း မတွေ့ပါ။ ဆရာ/ဆရာမကို ဆက်သွယ်ပါ။');
-      setParticipant(data);setAnswers(data.answers||{});setQuiz(quizRow.quiz_data);
+      if(!data?.student_data?.questions?.length)throw new Error('မေးခွန်းစာရင်း မတွေ့ပါ။ ဆရာ/ဆရာမကို ဆက်သွယ်ပါ။');
+      setParticipant(data);setAnswers(data.answers||{});setQuiz(data.student_data);
       sessionStorage.setItem('exam-room:'+String(joinCode).toUpperCase(),JSON.stringify({
         participant_id:data.participant_id,participant_token:data.participant_token,
         student_name:name.trim(),student_code:studentCode.trim()
