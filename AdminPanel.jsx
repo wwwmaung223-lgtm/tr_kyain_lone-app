@@ -67,7 +67,15 @@ export default function AdminPanel({ supabase, onClose, onAuthenticated, onLogou
     setChecking(false);
   }, [supabase, loadData]);
 
-  useEffect(() => {\n    const body = document.body;\n    const previousOverflow = body.style.overflow;\n    const previousOverscroll = body.style.overscrollBehavior;\n    body.style.overflow = 'hidden';\n    body.style.overscrollBehavior = 'none';\n    verifySession();\n    return () => { body.style.overflow = previousOverflow; body.style.overscrollBehavior = previousOverscroll; };\n  }, [verifySession]);
+  useEffect(() => {
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    const previousOverscroll = body.style.overscrollBehavior;
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
+    verifySession();
+    return () => { body.style.overflow = previousOverflow; body.style.overscrollBehavior = previousOverscroll; };
+  }, [verifySession]);
 
   const signIn = async e => {
     e.preventDefault(); setBusy(true); setError('');
