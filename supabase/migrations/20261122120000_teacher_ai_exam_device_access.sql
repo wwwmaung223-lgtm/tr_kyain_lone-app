@@ -22,7 +22,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_user_id uuid;
 begin
   if not public.is_platform_admin() then raise exception 'Admin access required'; end if;
@@ -41,7 +41,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_user_id uuid;
 begin
   if not public.is_platform_admin() then raise exception 'Admin access required'; end if;
@@ -73,7 +73,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_uid uuid := auth.uid(); v_session uuid; v_existing public.teacher_device_sessions%rowtype;
 begin
   if v_uid is null then raise exception 'Authentication required'; end if;
@@ -97,7 +97,7 @@ returns boolean
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_uid uuid := auth.uid(); v_session uuid := nullif(auth.jwt()->>'session_id','')::uuid;
 begin
   if v_uid is null or v_session is null then return false; end if;
@@ -142,7 +142,7 @@ begin
       alter publication supabase_realtime add table public.exam_rooms;
     end if;
   end if;
-end $;
+end $$;
 
 alter table public.exam_rooms enable row level security;
 alter table public.exam_room_participants enable row level security;
@@ -159,7 +159,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_room uuid;
 begin
   if auth.uid() is null then raise exception 'Authentication required'; end if;
@@ -178,7 +178,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype;
 begin
   if p_student_name is null or length(trim(p_student_name))<2 or length(trim(p_student_name))>100 then
@@ -212,7 +212,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare v_room_id uuid;
 begin
   if jsonb_typeof(coalesce(p_answers,'{}'::jsonb))<>'object' or octet_length(coalesce(p_answers,'{}'::jsonb)::text)>50000 then
