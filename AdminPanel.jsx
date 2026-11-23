@@ -145,8 +145,8 @@ export default function AdminPanel({ supabase, onClose }) {
 
   if (checking) return <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/40 p-4"><div className={card}><Loader2 className="mx-auto h-7 w-7 animate-spin text-violet-600"/><p className="mt-2 text-sm font-bold text-slate-700">Admin စစ်ဆေးနေသည်...</p></div></div>;
 
-  return <div className="fixed inset-0 z-[100] overflow-y-auto bg-[radial-gradient(circle_at_top_left,#e9e5ff,transparent_40%),linear-gradient(145deg,#f7f8ff,#edf5ff)] text-slate-900">
-    <div className="mx-auto min-h-[100dvh] w-full max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
+  return <div className="fixed inset-0 z-[100] overflow-x-hidden overflow-y-auto bg-[radial-gradient(circle_at_top_left,#e9e5ff,transparent_40%),linear-gradient(145deg,#f7f8ff,#edf5ff)] text-slate-900">
+    <div className="mx-auto min-h-[100dvh] w-full min-w-0 max-w-6xl px-3 pb-8 pt-3 sm:px-6 sm:pt-6">
       <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/80 p-3 shadow-sm backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-500 text-white"><ShieldCheck className="h-5 w-5"/></div><div className="min-w-0"><p className="truncate text-sm font-black">Platform Admin</p><p className="truncate text-[11px] text-slate-500">Tr.Kyain Lone · Secure Console</p></div></div>
         <button onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold"><ArrowLeft className="mr-1 inline h-4 w-4"/> ပိတ်ရန်</button>
@@ -163,12 +163,12 @@ export default function AdminPanel({ supabase, onClose }) {
           </form>
         </div>
       </div> : <>
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mb-4 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
           {[
             ['Accounts',users.length,Users],['Active access',activeCount,ShieldCheck],['Pending payments',pendingCount,Clock3],['Plans',plans.length,CreditCard]
           ].map(([label,value,Icon])=><div key={label} className={card+' min-w-0'}><Icon className="h-4 w-4 text-violet-600"/><p className="mt-2 text-xl font-black tabular-nums">{value}</p><p className="truncate text-[10px] font-semibold text-slate-500">{label}</p></div>)}
         </div>
-        <nav className="mb-4 grid grid-cols-5 gap-1 rounded-2xl border border-white bg-white/80 p-1 shadow-sm">
+        <nav className="mb-4 grid min-w-0 grid-cols-5 gap-1 rounded-2xl border border-white bg-white/80 p-1 shadow-sm">
           {[
             ['overview','Overview',LayoutDashboard],['plans','Plans',CreditCard],['payments','Payments',Wallet],['accounts','Users',Users],['payment-account','Pay account',Settings2]
           ].map(([key,label,Icon])=><button key={key} onClick={()=>setTab(key)} className={'flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-bold sm:flex-row sm:justify-center sm:text-xs '+(tab===key?'bg-violet-600 text-white shadow':'text-slate-600')}><Icon className="h-4 w-4"/>{label}</button>)}
