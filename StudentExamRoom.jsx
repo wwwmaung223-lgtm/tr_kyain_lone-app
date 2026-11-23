@@ -86,19 +86,20 @@ export default function StudentExamRoom({ supabase, joinCode }) {
     </div>
   </div>;
 
-  const locked=participant.participant_status==='completed';
+  const roomEnded=participant.room_status==='ended';
+  const locked=participant.participant_status==='completed'||roomEnded;
   const questions=quiz?.questions||[];
   const total=questions.reduce((n,q)=>n+(Number(q.marks)||0),0);
   return <div className="min-h-screen bg-slate-50 px-3 py-5 sm:px-5">
     <div className="mx-auto max-w-2xl space-y-4">
       <header className="rounded-3xl bg-slate-950 p-5 text-white"><p className="text-xs text-indigo-200">LIVE EXAM · {participant.student_name||name}</p><h1 className="mt-1 text-xl font-black">{quiz.title||'စာမေးပွဲ'}</h1><p className="mt-1 text-xs text-slate-300">{questions.length} မေးခွန်း · စုစုပေါင်း {total} မှတ်</p></header>
-      {notice&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
+      {roomEnded&&<p role="status" className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">ဆရာ/ဆရာမက စာမေးပွဲခန်းကို ပိတ်ထားပါပြီ။ သိမ်းထားသောအဖြေများကိုသာ ကြည့်ရှုနိုင်ပြီး ပြင်ဆင်ခြင်း၊ ထပ်မံတင်ခြင်း မပြုလုပ်နိုင်ပါ။</p>}{notice&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
       {error&&<p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
       {questions.map((q,i)=><section key={q.id||i} className="rounded-2xl border bg-white p-4 shadow-sm">
         <p className="text-xs font-bold text-indigo-600">မေးခွန်း {i+1} · {q.marks||0} မှတ်</p><p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-slate-900">{q.text}</p>
         {q.type==='mcq'?(q.options||[]).map((opt,j)=><label key={j} className="mt-2 flex items-center gap-2 rounded-xl border p-3 text-sm"><input type="radio" disabled={locked} name={'q-'+i} checked={String(answers[q.id||i]??'')===String(j)} onChange={()=>setAnswers(a=>({...a,[q.id||String(i)]:j}))}/><span>{String.fromCharCode(65+j)}. {opt}</span></label>):<textarea disabled={locked} rows={3} value={answers[q.id||String(i)]||''} onChange={e=>setAnswers(a=>({...a,[q.id||String(i)]:e.target.value}))} className="mt-3 w-full rounded-xl border p-3 text-sm" placeholder="သင့်အဖြေကို ရေးပါ..."/>}
       </section>)}
-      {!locked?<div className="sticky bottom-3 flex gap-2 rounded-2xl border bg-white/95 p-2 shadow-lg"><button disabled={busy} onClick={()=>persist(false)} className="flex-1 rounded-xl border py-3 text-sm font-bold">အဖြေသိမ်းမည်</button><button disabled={busy} onClick={()=>{if(window.confirm('အဖြေလွှာတင်ပြီးပါက ပြန်ပြင်၍မရပါ။ တင်မှာသေချာပါသလား?'))persist(true);}} className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white"><Send className="mr-1 inline h-4 w-4"/> Submit</button></div>:<div className="rounded-2xl bg-emerald-50 p-4 text-center text-sm font-bold text-emerald-800"><CheckCircle2 className="mr-2 inline"/> အဖြေလွှာ တင်ပြီးပါပြီ</div>}
+      {!locked?<div className="sticky bottom-3 flex gap-2 rounded-2xl border bg-white/95 p-2 shadow-lg"><button disabled={busy} onClick={()=>persist(false)} className="flex-1 rounded-xl border py-3 text-sm font-bold">အဖြေသိမ်းမည်</button><button disabled={busy} onClick={()=>{if(window.confirm('အဖြေလွှာတင်ပြီးပါက ပြန်ပြင်၍မရပါ။ တင်မှာသေချာပါသလား?'))persist(true);}} className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white"><Send className="mr-1 inline h-4 w-4"/> Submit</button></div>:<div className="rounded-2xl bg-emerald-50 p-4 text-center text-sm font-bold text-emerald-800"><CheckCircle2 className="mr-2 inline"/>{roomEnded?'စာမေးပွဲခန်း ပိတ်ထားပါပြီ':'အဖြေလွှာ တင်ပြီးပါပြီ'}</div>}
     </div>
   </div>;
 }
