@@ -41,17 +41,23 @@ async function pickModels(key) {
     .map(x => x.name);
 }
 
-async function verifyTeacher(accessToken) {
+async function verifyTeacher(accessToken, deviceId) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !publishableKey || !accessToken || typeof accessToken !== 'string') return false;
+  if (!url || !publishableKey || !accessToken || typeof accessToken !== 'string' || !deviceId) return false;
   try {
     const r = await fetch(`${url}/auth/v1/user`, {
       headers: { apikey: publishableKey, Authorization: `Bearer ${accessToken}` }
     });
     if (!r.ok) return false;
     const user = await r.json().catch(() => null);
-    return !!(user && user.id && user.email);
+    if (!(user && user.id && user.email)) return false;
+    const device = await fetch(`${url}/rest/v1/rpc/touch_teacher_device`, {
+      method: 'POST', headers: { apikey: publishableKey, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_device_id: deviceId })
+    });
+    if (!device.ok) return false;
+    return (await device.json()) === true;
   } catch {
     return false;
   }
@@ -101,9 +107,9 @@ export default async function handler(req, res) {
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) { body = {}; } }
   body = body || {};
-  const { base64Data, mimeType, customInstruction, accessToken } = body;
+  const { base64Data, mimeType, customInstruction, accessToken, deviceId } = body;
 
-  if (!(await verifyTeacher(accessToken))) return res.status(401).json({ success: false, error: 'ဆရာ/ဆရာမ အကောင့် အတည်မပြုနိုင်ပါ။ ပြန်ထွက်ပြီး ပြန်ဝင်ပါ။' });
+  if (!(await verifyTeacher(accessToken, deviceId))) return res.status(401).json({ success: false, error: 'ဆရာ/ဆရာမ အကောင့် အတည်မပြုနိုင်ပါ။ ပြန်ထွက်ပြီး ပြန်ဝင်ပါ။' });
   if (!base64Data || typeof base64Data !== 'string') return res.status(400).json({ success: false, error: 'ဖိုင် မပါလာပါ' });
   // Vercel serverless request bodies are limited; the frontend caps source files at 3MB.
   if (base64Data.length > 4_200_000) return res.status(413).json({ success: false, error: 'ဖိုင်အရွယ်အစား 3MB အောက်ဖြစ်အောင် လျှော့ပြီး ပြန်တင်ပါ။' });

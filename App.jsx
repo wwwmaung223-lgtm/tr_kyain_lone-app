@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const SubscriptionCenter = React.lazy(() => import('./SubscriptionCenter.jsx'));
 const TeachingHub = React.lazy(() => import('./TeachingHub.jsx'));
 const AiQuizStudio = React.lazy(() => import('./AiQuizStudio.jsx'));
+const TeacherAIWorkspace = React.lazy(() => import('./TeacherAIWorkspace.jsx'));
+import StudentExamRoom from './StudentExamRoom.jsx';
 import {
   Camera,
   Sparkles,
@@ -41,8 +43,15 @@ import {
 // Supabase setup (Auth + Postgres)
 // ============================================================================
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabasePublishableKey);
+
+const getTeacherDeviceId = () => {
+  const key = 'tr_kyain_lone_device_id';
+  let id = window.localStorage.getItem(key);
+  if (!id) { id = window.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`; window.localStorage.setItem(key, id); }
+  return id;
+};
 const supabase = hasSupabaseConfig ? createClient(supabaseUrl, supabasePublishableKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 }) : null;
@@ -144,7 +153,7 @@ const generateQuizFromApi = async (base64Data, mimeType, customInstruction, onSt
   const response = await fetch('/api/generate-quiz', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64Data, mimeType, customInstruction, accessToken })
+    body: JSON.stringify({ base64Data, mimeType, customInstruction, accessToken, deviceId: getTeacherDeviceId() })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.success) {
@@ -201,6 +210,7 @@ export default function App() {
   // Supabase Auth User
   const [fbUser, setFbUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const deviceClaimRef = useRef('');
 
   // Teacher Account Session State (Gmail + Custom Password)
   const [teacherAccount, setTeacherAccount] = useState(null);
@@ -210,6 +220,9 @@ export default function App() {
   const [registerName, setRegisterName] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   // Navigation & Global UI Feedback
   const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription' | 'teaching'
@@ -348,9 +361,57 @@ export default function App() {
     setMyQuizzes(Object.values(localQuizzes));setAllSubmissions(Object.values(readLocalMap(LOCAL_KEYS.SUBMISSIONS)));
     if(!supabase){setAuthReady(true);return;}
     supabase.auth.getSession().then(({data})=>{const user=data?.session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);}).catch(()=>setAuthReady(true));
-    const {data:authListener}=supabase.auth.onAuthStateChange((_event,session)=>{const user=session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);});
+    const {data:authListener}=supabase.auth.onAuthStateChange((event,session)=>{if(event==='PASSWORD_RECOVERY'){setPasswordRecovery(true);setActiveTab('creator');setAuthError('');}const user=session?.user||null;setFbUser(user);setTeacherAccount(user?{email:user.email,displayName:user.user_metadata?.display_name||user.email?.split('@')[0]||'Teacher',uid:user.id}:null);setAuthReady(true);});
     return()=>authListener.subscription.unsubscribe();
   },[]);
+
+  // 1b. Enforce one active teacher device through the database session registry.
+  useEffect(() => {
+    if (!authReady || !fbUser?.id || !supabase || deviceClaimRef.current === fbUser.id) return;
+    deviceClaimRef.current = fbUser.id;
+    const deviceId = getTeacherDeviceId();
+    const claim = async () => {
+      try {
+        const args = { p_device_id: deviceId, p_device_label: /mobile/i.test(navigator.userAgent) ? 'Mobile device' : 'Desktop browser', p_replace: false };
+        const { data, error } = await supabase.rpc('claim_teacher_device', args);
+        if (error) throw error;
+        if (data?.conflict) {
+          const replace = window.confirm('ဒီအကောင့်ကို အခြားစက်တစ်လုံးတွင် အသုံးပြုနေပါသည်။ အခြားစက်၏ session ကို ပိတ်ပြီး ဒီစက်တွင် ဆက်ဝင်မလား?');
+          if (!replace) {
+            deviceClaimRef.current = '';
+            await supabase.auth.signOut();
+            notify('အခြားစက်တွင် လက်ရှိ session ကို ဆက်လက်အသုံးပြုနေပါသည်။');
+            return;
+          }
+          const { data: replaced, error: replaceError } = await supabase.rpc('claim_teacher_device', { ...args, p_replace: true });
+          if (replaceError || !replaced?.success) throw replaceError || new Error('ဒီစက်ကို active device အဖြစ် သတ်မှတ်မရပါ။');
+          notify('ဒီစက်ကို active device အဖြစ် ပြောင်းပြီးပါပြီ။');
+        } else if (!data?.success) throw new Error('Device session ကို အတည်မပြုနိုင်ပါ။');
+      } catch (err) {
+        deviceClaimRef.current = '';
+        console.error('Device session check failed:', err);
+        notify('Device security ကို အတည်မပြုနိုင်ပါ။ Database migration အသင့်ဖြစ်ပြီးမှ ပြန်ဝင်ပါ။');
+        await supabase.auth.signOut();
+      }
+    };
+    claim();
+  }, [authReady, fbUser?.id, supabase]);
+
+  // Keep the active device lease fresh; a replaced device is signed out on its next heartbeat.
+  useEffect(() => {
+    if (!authReady || !fbUser?.id || !supabase) return;
+    const deviceId = getTeacherDeviceId();
+    const heartbeat = async () => {
+      const { data, error } = await supabase.rpc('touch_teacher_device', { p_device_id: deviceId });
+      if (error || data !== true) {
+        deviceClaimRef.current = '';
+        await supabase.auth.signOut();
+        notify('ဤအကောင့်၏ active device ကို အခြားစက်သို့ ပြောင်းထားပါသည်။');
+      }
+    };
+    const timer = window.setInterval(heartbeat, 30000);
+    return () => window.clearInterval(timer);
+  }, [authReady, fbUser?.id, supabase]);
 
   // 2. DETECT HASH / URL PARAMETERS (#q=XXXXXX or #s=XXXXXX) ON LOAD & HASHCHANGE
   // ==========================================================================
@@ -433,11 +494,13 @@ export default function App() {
     e.preventDefault();setAuthError('');const email=loginEmail.trim().toLowerCase(),password=loginPassword;
     if(!supabase){setAuthError('Supabase ချိတ်ဆက်မှု မရှိသေးပါ။ Vercel Environment Variables ကို စစ်ပါ။');return;}
     if(!email||!email.includes('@')){setAuthError('Gmail လိပ်စာ မှန်ကန်စွာ ထည့်ပါ။');return;}
-    if(password.length<6){setAuthError('Password အနည်းဆုံး ၆ လုံး ထည့်ပါ။');return;}
+    if(password.length<(authMode==='register'?8:6)){setAuthError(authMode==='register'?'အကောင့်အသစ်အတွက် Password အနည်းဆုံး ၈ လုံး ထည့်ပါ။':'Password အနည်းဆုံး ၆ လုံး ထည့်ပါ။');return;}
     setIsAuthLoading(true);
-    try{let result;if(authMode==='register'){const displayName=registerName.trim()||email.split('@')[0];result=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName}}});}else result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(!result.data?.user)throw new Error('အကောင့်အတည်ပြုရန် Email ကို စစ်ဆေးပါ။');if(authMode==='register'&&!result.data.session)throw new Error('Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပြီးမှ Login ဝင်ပါ။');const user=result.data.user,displayName=user.user_metadata?.display_name||email.split('@')[0];completeTeacherLogin({email,displayName,uid:user.id},authMode==='register'?`အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`:`ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);}
+    try{let result;if(authMode==='register'){const displayName=registerName.trim()||email.split('@')[0];result=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName},emailRedirectTo:window.location.origin+'/'} });}else result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(!result.data?.user)throw new Error('အကောင့်အတည်ပြုရန် Email ကို စစ်ဆေးပါ။');if(authMode==='register'&&!result.data.session)throw new Error('Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပြီးမှ Login ဝင်ပါ။');const user=result.data.user,displayName=user.user_metadata?.display_name||email.split('@')[0];completeTeacherLogin({email,displayName,uid:user.id},authMode==='register'?`အကောင့်အသစ် ဖွင့်ပြီးပါပြီ။ ကြိုဆိုပါတယ် ${displayName}`:`ပြန်လည်ကြိုဆိုပါတယ် ${displayName}`);}
     catch(err){const messages={'User already registered':'ဤ Gmail ဖြင့် အကောင့်ဖွင့်ပြီးသားပါ။ Login ဝင်ပါ။','Invalid login credentials':'Gmail သို့မဟုတ် Password မှားနေပါသည်။','Email not confirmed':'Email အတည်ပြုရန် Inbox ကို စစ်ဆေးပါ။'};setAuthError(messages[err.message]||err.message||'အကောင့်ဝင်ရာတွင် အခက်အခဲရှိပါသည်။');}finally{setIsAuthLoading(false);}
   };
+  const handlePasswordResetRequest=async()=>{setAuthError('');const email=loginEmail.trim().toLowerCase();if(!supabase){setAuthError('Supabase ချိတ်ဆက်မှု မရှိသေးပါ။');return;}if(!email||!email.includes('@')){setAuthError('Password ပြန်သတ်မှတ်ရန် Gmail လိပ်စာ ထည့်ပါ။');return;}setIsAuthLoading(true);try{const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${window.location.origin}/`});if(error)throw error;setAuthError('Password ပြန်သတ်မှတ်ရန် လင့်ခ်ကို Gmail သို့ ပို့ပြီးပါပြီ။ Inbox နှင့် Spam ကို စစ်ဆေးပါ။');}catch(err){setAuthError(err.message||'Password reset email ပို့မရပါ။');}finally{setIsAuthLoading(false);}};
+  const handlePasswordRecoverySubmit=async(e)=>{e.preventDefault();setAuthError('');if(newPassword.length<8){setAuthError('Password အသစ် အနည်းဆုံး ၈ လုံး ထည့်ပါ။');return;}if(newPassword!==confirmNewPassword){setAuthError('Password အသစ်နှစ်ခု မတူပါ။');return;}setIsAuthLoading(true);try{const {error}=await supabase.auth.updateUser({password:newPassword});if(error)throw error;setPasswordRecovery(false);setNewPassword('');setConfirmNewPassword('');setLoginPassword('');notify('Password အသစ် ပြောင်းပြီးပါပြီ။');}catch(err){setAuthError(err.message||'Password ပြောင်းလဲမရပါ။');}finally{setIsAuthLoading(false);}};
   const handleTeacherLogout=async()=>{try{if(supabase)await supabase.auth.signOut();}catch(err){console.warn('Sign out:',err);}setTeacherAccount(null);setFbUser(null);setLoginPassword('');setGeneratedQuizLink('');setGeneratedQuizCode('');notify('အကောင့်မှ ထွက်လိုက်ပါပြီ');};
 
   // 5. AI PHOTO-TO-QUIZ HANDLERS
@@ -942,7 +1005,16 @@ export default function App() {
     );
   }, [teacherSubmissions, searchQuery]);
 
-  const showTeacherAuthGate = (activeTab === 'creator' || activeTab === 'dashboard') && !teacherAccount;
+  const showTeacherAuthGate = !teacherAccount && activeTab !== 'student';
+
+  const openTeacherTab = (tab) => {
+    if (!teacherAccount) {
+      setActiveTab('creator');
+      notify('ဤအပိုင်းကို အသုံးပြုရန် Teacher Account ဖြင့် Login ဝင်ပါ။');
+      return;
+    }
+    setActiveTab(tab);
+  };
 
   const displayWorksheetImg = activeQuiz?.worksheetImage || (activeQuiz?.code === generatedQuizCode ? worksheetImage : '');
 
@@ -1031,8 +1103,14 @@ export default function App() {
         {/* ==================================================================
             SCROLLABLE MOBILE BODY CONTENT
            ================================================================== */}
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-28 space-y-4">
-          {activeTab === 'teaching' && teacherAccount ? (
+        <main className="flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 pt-2 pb-36 space-y-4">
+          {new URLSearchParams(window.location.search).get('e') ? (
+            <StudentExamRoom supabase={supabase} joinCode={new URLSearchParams(window.location.search).get('e')} />
+          ) : activeTab === 'ai' && teacherAccount ? (
+            <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading AI Agents…</div>}>
+              <TeacherAIWorkspace supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
+            </React.Suspense>
+          ) : activeTab === 'teaching' && teacherAccount ? (
             <React.Suspense fallback={<div role="status" className="liquid-panel rounded-2xl p-5 text-center text-xs font-semibold text-slate-600">Loading Teaching Hub…</div>}>
               <TeachingHub supabase={supabase} user={fbUser} onClose={() => setActiveTab('creator')} />
             </React.Suspense>
@@ -1142,7 +1220,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <form onSubmit={handleTeacherAuthSubmit} className="space-y-3">
+                <form onSubmit={passwordRecovery ? handlePasswordRecoverySubmit : handleTeacherAuthSubmit} className="space-y-3">
                   {authMode === 'register' && (
                     <div>
                       <label className="block text-[11px] font-bold text-slate-700 mb-1">
@@ -1177,7 +1255,19 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div>
+                  {passwordRecovery ? (
+                    <>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Password အသစ်</label>
+                        <input type="password" autoComplete="new-password" value={newPassword} onChange={(e)=>setNewPassword(e.target.value)} placeholder="အနည်းဆုံး ၈ လုံး" className="w-full px-3.5 py-3 rounded-2xl bg-white/90 border border-slate-200 text-xs font-semibold text-slate-900 outline-none focus:border-indigo-500" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">Password အသစ် ထပ်ထည့်ပါ</label>
+                        <input type="password" autoComplete="new-password" value={confirmNewPassword} onChange={(e)=>setConfirmNewPassword(e.target.value)} placeholder="Password အသစ်ကို ထပ်ရိုက်ပါ" className="w-full px-3.5 py-3 rounded-2xl bg-white/90 border border-slate-200 text-xs font-semibold text-slate-900 outline-none focus:border-indigo-500" />
+                      </div>
+                    </>
+                  ) : (
+                                      <div>
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       ကိုယ်ပိုင်စကားဝှက် (Password)
                     </label>
@@ -1192,6 +1282,7 @@ export default function App() {
                       />
                     </div>
                   </div>
+                  )}
 
                   {authError && (
                     <p className="text-[11px] font-bold text-rose-600 bg-rose-50/95 px-3 py-2 rounded-xl border border-rose-200/70">
@@ -1199,6 +1290,14 @@ export default function App() {
                     </p>
                   )}
 
+                  {!passwordRecovery && authMode === 'login' && (
+                    <div className="text-right -mt-1">
+                      <button type="button" onClick={handlePasswordResetRequest} disabled={isAuthLoading} className="text-[11px] font-bold text-indigo-700 underline underline-offset-2 disabled:opacity-50">Password မေ့နေပါသလား?</button>
+                    </div>
+                  )}
+                  {passwordRecovery && (
+                    <button type="button" onClick={()=>{setPasswordRecovery(false);setNewPassword('');setConfirmNewPassword('');setAuthError('');}} className="w-full text-[11px] font-bold text-slate-600">Login သို့ ပြန်သွားမည်</button>
+                  )}
                   <button
                     type="submit"
                     disabled={isAuthLoading}
@@ -1213,9 +1312,7 @@ export default function App() {
                       <>
                         <KeyRound className="w-4 h-4" />
                         <span>
-                          {authMode === 'login'
-                            ? 'Gmail ဖြင့် အကောင့်ဝင်မည်'
-                            : 'အကောင့်အသစ် ဖွင့်ပြီး ဝင်မည်'}
+                          {passwordRecovery ? 'Password အသစ် သိမ်းမည်' : authMode === 'login' ? 'Gmail ဖြင့် အကောင့်ဝင်မည်' : 'အကောင့်အသစ် ဖွင့်ပြီး ဝင်မည်'}
                         </span>
                       </>
                     )}
@@ -2185,71 +2282,80 @@ export default function App() {
         {/* ==================================================================
             BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
            ================================================================== */}
-        <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-[396px]">
-          <div className="ios-glass-strong rounded-[28px] p-1.5 grid grid-cols-5 gap-1 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
+        <nav aria-label="Main navigation" className="bottom-navigation fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-1rem)] max-w-[560px] -translate-x-1/2">
+          <div className="bottom-navigation-grid ios-glass-strong rounded-[22px] p-1 grid grid-cols-6 gap-0.5 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
             <button
               type="button"
               onClick={() => setActiveTab('creator')}
-              className={`py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'creator'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span className="text-[10px] font-bold">မေးခွန်းထုတ်</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold break-words">မေးခွန်းထုတ်</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('student')}
-              className={`py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'student'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span className="text-[10px] font-bold">ကျောင်းသားဖြေ</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold break-words">ကျောင်းသားဖြေ</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab('teaching')}
-              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              onClick={() => openTeacherTab('ai')}
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${activeTab === 'ai' ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              <span className="text-sm">✨</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold">AI Agents</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openTeacherTab('teaching')}
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'teaching'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <span className="text-sm">📚</span>
-              <span className="text-[10px] font-bold">Teaching</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold">Teaching</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab('subscription')}
-              className={`py-2 px-1 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              onClick={() => openTeacherTab('subscription')}
+              className={`min-w-0 py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-1 transition-all ${
                 activeTab === 'subscription'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <span className="text-sm">💳</span>
-              <span className="text-[10px] font-bold">Plan</span>
+              <span className="w-full text-center text-[9px] leading-tight font-bold">Plan</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab('dashboard')}
-              className={`relative py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              onClick={() => openTeacherTab('dashboard')}
+              className={`relative min-w-0 w-full py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-0.5 transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <ClipboardCheck className="w-4 h-4" />
-              <span className="text-[10px] font-bold">
+              <span className="w-full text-center text-[9px] leading-tight font-bold break-words">
                 အမှတ်စစ် ({teacherAccount ? teacherSubmissions.length : 0})
               </span>
             </button>

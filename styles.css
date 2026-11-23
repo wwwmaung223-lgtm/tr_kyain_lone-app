@@ -217,3 +217,40 @@ button{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}butt
     backdrop-filter: none;
   }
 }
+
+
+/* Mobile bottom navigation: six equal, non-wrapping destinations */
+.bottom-navigation { padding-bottom: env(safe-area-inset-bottom); }
+.bottom-navigation-grid {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.bottom-navigation-grid > button {
+  min-width: 0 !important;
+  width: 100%;
+  max-width: 100%;
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+  overflow: hidden;
+}
+.bottom-navigation-grid > button > span:last-child {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  font-size: clamp(7px, 2.05vw, 9px);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.bottom-navigation-grid > button > svg,
+.bottom-navigation-grid > button > span:first-child:not(:last-child) {
+  flex: 0 0 auto;
+}
+@media (max-width: 380px) {
+  .bottom-navigation-grid { gap: 1px !important; padding: 4px !important; }
+  .bottom-navigation-grid > button { border-radius: 14px !important; padding-top: 8px !important; padding-bottom: 8px !important; }
+}
