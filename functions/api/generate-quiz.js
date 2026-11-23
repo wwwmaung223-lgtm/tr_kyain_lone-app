@@ -130,6 +130,37 @@ async function generateGroq(key, prompt, mimeType, base64Data) {
     model: 'qwen/qwen3.8-27b', prompt, mimeType, base64Data, provider: 'Groq'
   });
 }
+async function generateCloudflareAI(ai, prompt, mimeType, base64Data) {
+  if (!ai || typeof ai.run !== 'function') throw new Error('Cloudflare Workers AI binding မချိတ်ရသေးပါ။');
+  if (mimeType === 'application/pdf') throw new Error('Workers AI vision route currently accepts image uploads; PDF uses the configured provider fallback.');
+  const dataUrl = `data:${mimeType};base64,${base64Data}`;
+  const models = [
+    '@cf/meta/llama-3.2-11b-vision-instruct',
+    '@cf/mistralai/mistral-small-3.1-24b-instruct'
+  ];
+  let lastError;
+  for (const model of models) {
+    try {
+      const output = await ai.run(model, {
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUrl } }
+          ]
+        }],
+        temperature: 0.15,
+        max_tokens: 8192
+      });
+      const text = output?.response || output?.result?.response || '';
+      if (!text) throw new Error(`Cloudflare AI ${model} က အဖြေဗလာ ပြန်ပေးပါတယ်။`);
+      return extractJson(text);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Cloudflare Workers AI မအောင်မြင်ပါ။');
+}
 export async function onRequest({ request, env }) {
   // Preserve the exact Secret name already configured in the user's Cloudflare project.
   const key = env.GEMINI_API_KEY || env.GEMINI_APT_KEY;
@@ -199,6 +230,11 @@ QUALITY RULES:
   // Multi-provider routing: OpenAI and Groq handle images; Gemini also handles PDFs.
   const imageOnly = mimeType !== 'application/pdf';
   const providers = [];
+  // Prefer Cloudflare Workers AI for photo uploads; no third-party API key is needed.
+  if (imageOnly && env.AI) providers.push({
+    name: 'Cloudflare Workers AI',
+    run: () => generateCloudflareAI(env.AI, prompt, mimeType, base64Data)
+  });
   if (imageOnly && openaiKey) providers.push({ name: 'OpenAI', run: () => generateOpenAI(openaiKey, prompt, mimeType, base64Data) });
   if (imageOnly && groqKey) providers.push({ name: 'Groq', run: () => generateGroq(groqKey, prompt, mimeType, base64Data) });
   if (key) {
