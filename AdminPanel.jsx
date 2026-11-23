@@ -168,9 +168,9 @@ export default function AdminPanel({ supabase, onClose }) {
             ['Accounts',users.length,Users],['Active access',activeCount,ShieldCheck],['Pending payments',pendingCount,Clock3],['Plans',plans.length,CreditCard]
           ].map(([label,value,Icon])=><div key={label} className={card+' min-w-0'}><Icon className="h-4 w-4 text-violet-600"/><p className="mt-2 text-xl font-black tabular-nums">{value}</p><p className="truncate text-[10px] font-semibold text-slate-500">{label}</p></div>)}
         </div>
-        <nav className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-white bg-white/80 p-1 shadow-sm">
+        <nav className="mb-4 grid grid-cols-5 gap-1 rounded-2xl border border-white bg-white/80 p-1 shadow-sm">
           {[
-            ['overview','Overview',LayoutDashboard],['plans','Plans',CreditCard],['payments','Payments',Wallet],['accounts','Users',Users]
+            ['overview','Overview',LayoutDashboard],['plans','Plans',CreditCard],['payments','Payments',Wallet],['accounts','Users',Users],['payment-account','Pay account',Settings2]
           ].map(([key,label,Icon])=><button key={key} onClick={()=>setTab(key)} className={'flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-bold sm:flex-row sm:justify-center sm:text-xs '+(tab===key?'bg-violet-600 text-white shadow':'text-slate-600')}><Icon className="h-4 w-4"/>{label}</button>)}
         </nav>
         {error && <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
