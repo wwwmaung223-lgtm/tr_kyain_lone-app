@@ -179,19 +179,21 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype;
+declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype; v_student_data jsonb;
 begin
   if p_student_name is null or length(trim(p_student_name))<2 or length(trim(p_student_name))>100 then
     raise exception 'Enter a valid student name';
   end if;
   select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code)) and status in ('waiting','live');
   if not found then raise exception 'Exam room not found or closed'; end if;
+  select student_data into v_student_data from public.quiz_assessments where code=v_room.quiz_code and is_published=true;
+  if v_student_data is null then raise exception 'Published exam content not found'; end if;
   insert into public.exam_room_participants(room_id,student_name,student_code,status)
   values(v_room.id,left(trim(p_student_name),100),left(nullif(trim(p_student_code),''),50),'joined')
   returning * into v_participant;
   return jsonb_build_object('participant_id',v_participant.id,'participant_token',v_participant.participant_token,'room_id',v_room.id,
     'quiz_code',v_room.quiz_code,'room_status',v_room.status,'answers',v_participant.answers,
-    'participant_status',v_participant.status);
+    'participant_status',v_participant.status,'student_data',v_student_data);
 end;
 $$;
 
@@ -202,16 +204,19 @@ language plpgsql
 security definer
 set search_path = ''
 as $
-declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype;
+declare v_room public.exam_rooms%rowtype; v_participant public.exam_room_participants%rowtype; v_student_data jsonb;
 begin
   select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code));
   if not found then raise exception 'Exam room not found'; end if;
   select * into v_participant from public.exam_room_participants
     where id=p_participant_id and room_id=v_room.id and participant_token=p_participant_token;
   if not found then raise exception 'Saved student session not found'; end if;
+  select student_data into v_student_data from public.quiz_assessments where code=v_room.quiz_code and is_published=true;
+  if v_student_data is null then raise exception 'Published exam content not found'; end if;
   return jsonb_build_object('participant_id',v_participant.id,'participant_token',v_participant.participant_token,
     'room_id',v_room.id,'quiz_code',v_room.quiz_code,'room_status',v_room.status,
-    'answers',v_participant.answers,'participant_status',v_participant.status,'student_name',v_participant.student_name);
+    'answers',v_participant.answers,'participant_status',v_participant.status,'student_name',v_participant.student_name,
+    'student_data',v_student_data);
 end;
 $;
 
