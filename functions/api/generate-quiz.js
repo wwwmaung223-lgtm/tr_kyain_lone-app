@@ -91,15 +91,57 @@ async function generate(model, key, parts, ms = 55000) {
   if (!text) throw new Error('Gemini က အဖြေဗလာ ပြန်ပေးပါတယ်။');
   return extractJson(text);
 }
+async function generateOpenAICompatible({ endpoint, key, model, prompt, mimeType, base64Data, provider }) {
+  const imageUrl = `data:${mimeType};base64,${base64Data}`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } }
+      ] }],
+      temperature: 0.15,
+      max_tokens: 8192,
+      response_format: { type: 'json_object' }
+    }),
+    signal: AbortSignal.timeout(45000)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.error?.message || `${provider} HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  const output = data.choices?.[0]?.message?.content;
+  if (!output) throw new Error(`${provider} က အဖြေဗလာ ပြန်ပေးပါတယ်။`);
+  return extractJson(output);
+}
+async function generateOpenAI(key, prompt, mimeType, base64Data) {
+  return generateOpenAICompatible({
+    endpoint: 'https://api.openai.com/v1/chat/completions', key,
+    model: 'gpt-4.1-mini', prompt, mimeType, base64Data, provider: 'OpenAI'
+  });
+}
+async function generateGroq(key, prompt, mimeType, base64Data) {
+  return generateOpenAICompatible({
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions', key,
+    model: 'qwen/qwen3.8-27b', prompt, mimeType, base64Data, provider: 'Groq'
+  });
+}
 export async function onRequest({ request, env }) {
   // Preserve the exact Secret name already configured in the user's Cloudflare project.
   const key = env.GEMINI_API_KEY || env.GEMINI_APT_KEY;
+  const openaiKey = env.OPENAI_API_KEY;
+  const groqKey = env.GROQ_API_KEY;
   if (request.method === 'GET') return json({
-    key_set: !!key,
+    key_set: !!(key || openaiKey || groqKey),
+    providers: { gemini: !!key, openai: !!openaiKey, groq: !!groqKey },
     supabase_configured: !!((env.SUPABASE_URL || env.VITE_SUPABASE_URL) && (env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY))
   });
   if (request.method !== 'POST') return json({ success: false, error: 'POST only' }, 405);
-  if (!key) return json({ success: false, error: 'Gemini API Secret ကို Cloudflare မှာ မတွေ့ပါ။ Secret name ကို စစ်ဆေးပါ။' }, 500);
+  if (!key && !openaiKey && !groqKey) return json({ success: false, error: 'AI Provider Secret မတွေ့ပါ။ Gemini, OpenAI သို့မဟုတ် Groq API key တစ်ခုခု ထည့်ပါ။' }, 500);
 
   let body;
   try { body = await request.json(); } catch { return json({ success: false, error: 'ပို့လိုက်တဲ့အချက်အလက်ကို ဖတ်မရပါ။' }, 400); }
@@ -125,51 +167,31 @@ export async function onRequest({ request, env }) {
     if (label === 'language') settings.language = value;
   }
   const requestedCount = Math.max(1, Math.min(30, Number(settings.count) || 10));
-  const models = await pickModels(key).catch(e => []);
-  if (!models.length) return json({ success: false, error: 'Gemini model စာရင်း မရပါ။ API Key သို့မဟုတ် API quota ကို စစ်ဆေးပါ။' }, 502);
-
-  const imagePart = { inline_data: { mime_type: mimeType, data: base64Data } };
-  const prompt = `You are a multimodal OCR specialist, experienced school teacher, assessment designer and answer-key verifier.
-First read the uploaded worksheet/photo/PDF page carefully. Internally transcribe the source in reading order, identify its topic, facts, examples, formulas, exercises and any printed answer choices. Then create a classroom-ready quiz grounded ONLY in that uploaded source.
-
-TEACHER SETTINGS:
-Subject: ${settings.subject || 'Infer from source'}
-Grade: ${settings.grade || 'Appropriate to source'}
-Difficulty: ${settings.difficulty || 'Balanced'}
-Question format: ${settings.questionType || 'Mixed questions'}
-Requested number: ${requestedCount}
-Language: ${settings.language || 'Preserve source language'}
-Additional instruction: ${String(customInstruction).slice(0, 700)}
-
-Return ONLY valid JSON using this schema:
-{"title":"short title","description":"student instruction","sourceText":"faithful concise transcription of the key source content","uncertainParts":["unreadable or ambiguous parts"],"questions":[{"type":"mcq or written","text":"complete question","marks":1,"options":["choice A","choice B","choice C","choice D"],"correctOption":0}]}
-
-QUALITY RULES:
-- Read the actual uploaded material, not the sample quiz or assumed subject. Preserve important terminology, formulas, units, names and facts.
-- Generate up to ${requestedCount} useful questions. If the source does not support that many, return fewer rather than inventing content.
-- If the source is an existing worksheet/question paper, preserve its tested skills and key wording. Do not silently change what is being tested.
-- If the source is lesson notes/textbook material, create new questions that test the key ideas actually present in it.
-- Use a balanced progression of recall, understanding and application appropriate to grade and difficulty.
-- MCQ choices must be plausible, distinct and supported by the topic. Use 3 or 4 choices; never add filler choices just to reach four.
-- correctOption is a zero-based index. Verify the answer against the source and your subject knowledge. If uncertain, make it a written question instead of guessing.
-- Use written questions for explanations, essays, calculations and questions that cannot be fairly assessed by one MCQ.
-- Avoid duplicate, vague, trick or ambiguous questions. Each question must be self-contained.
-- If Myanmar + English is selected, provide clear natural bilingual wording while preserving technical meaning.
-- Do not claim OCR certainty for blurry text. Put unclear sections in uncertainParts.
-- Output JSON only; no markdown fences or commentary.`;
+  // Multi-provider routing: OpenAI and Groq handle images; Gemini also handles PDFs.
+  const imageOnly = mimeType !== 'application/pdf';
+  const providers = [];
+  if (imageOnly && openaiKey) providers.push({ name: 'OpenAI', run: () => generateOpenAI(openaiKey, prompt, mimeType, base64Data) });
+  if (imageOnly && groqKey) providers.push({ name: 'Groq', run: () => generateGroq(groqKey, prompt, mimeType, base64Data) });
+  if (key) {
+    const models = await pickModels(key).catch(() => []);
+    for (const model of models.slice(0, 4)) {
+      providers.push({ name: `Gemini (${model})`, run: () => generate(model, key, [{ text: prompt }, imagePart], 18000) });
+    }
+  }
   let result;
   let generationError;
-  // Try several available Flash models: a single Gemini model can be temporarily overloaded.
-  for (const model of models.slice(0, 4)) {
+  for (const provider of providers) {
     try {
-      result = await generate(model, key, [{ text: prompt }, imagePart], 18000);
+      result = await provider.run();
       break;
     } catch (e) {
       generationError = e;
       const message = String(e.message || '').toLowerCase();
       const transient = e.status === 429 || e.status === 500 || e.status === 502 || e.status === 503 || e.status === 504 ||
         /high demand|overloaded|temporarily unavailable|resource_exhausted|rate limit/i.test(message);
-      if (!transient || e.name === 'AbortError') break;
+      // Fail over on transient provider errors; stop on invalid credentials or malformed requests.
+      if (!transient && e.status !== undefined) continue;
+      if (!transient) continue;
     }
   }
   if (!result) {
