@@ -236,7 +236,7 @@ button{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}butt
   padding-right: 2px !important;
   overflow: hidden;
 }
-.bottom-navigation-grid > button > span {
+.bottom-navigation-grid > button > span:last-child {
   display: block;
   width: 100%;
   min-width: 0;
