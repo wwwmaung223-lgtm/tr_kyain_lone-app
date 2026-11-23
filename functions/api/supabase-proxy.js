@@ -11,7 +11,7 @@ export async function onRequest({ request, env }) {
   if (!allowed.test(path) || path.includes('..') || path.startsWith('//')) {
     return Response.json({ error: 'Invalid Supabase API path' }, { status: 400 });
   }
-  const base = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  const base = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || 'https://esoekjjwsbtuyjkrbnam.supabase.co').replace(/\/$/, '');
   if (!base) return Response.json({ error: 'Supabase URL is not configured' }, { status: 503 });
   const target = base + '/' + path;
   try {
