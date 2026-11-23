@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const SubscriptionCenter = React.lazy(() => import('./SubscriptionCenter.jsx'));
 const TeachingHub = React.lazy(() => import('./TeachingHub.jsx'));
 const AiQuizStudio = React.lazy(() => import('./AiQuizStudio.jsx'));
+const AdminPanel = React.lazy(() => import('./AdminPanel.jsx'));
 import {
   Camera,
   Sparkles,
@@ -228,6 +229,7 @@ export default function App() {
   // Navigation & Global UI Feedback
   const [activeTab, setActiveTab] = useState('creator'); // 'creator' | 'student' | 'dashboard' | 'subscription' | 'teaching'
   const adminLogoTapRef = useRef({ count: 0, at: 0 });
+  const [adminOpen, setAdminOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [copiedId, setCopiedId] = useState('');
 
@@ -988,7 +990,7 @@ export default function App() {
         <header className="sticky top-0 z-30 px-4 pt-3 pb-2">
           <div className="ios-glass-strong rounded-[26px] px-4 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div onClick={() => { const now = Date.now(); const tap = adminLogoTapRef.current; if (now - tap.at > 1800) tap.count = 0; tap.at = now; tap.count += 1; if (tap.count >= 5) { tap.count = 0; setActiveTab(teacherAccount ? 'subscription' : 'creator'); if (!teacherAccount) notify('Admin Panel ဝင်ရန် အရင် Login ဝင်ပါ။'); } }} className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-300/50 shrink-0 cursor-pointer select-none">
+              <div onClick={() => { const now = Date.now(); const tap = adminLogoTapRef.current; if (now - tap.at > 1800) tap.count = 0; tap.at = now; tap.count += 1; if (tap.count >= 5) { tap.count = 0; setAdminOpen(true); } }} className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-500 to-sky-400 flex items-center justify-center text-white shadow-md shadow-indigo-300/50 shrink-0 cursor-pointer select-none">
                 <GraduationCap className="w-5 h-5" />
               </div>
               <div className="min-w-0">
@@ -2270,6 +2272,7 @@ export default function App() {
           </div>
         </nav>
       </div>
+      {adminOpen && <React.Suspense fallback={<div className="fixed inset-0 z-[100] grid place-items-center bg-white/80 text-sm font-bold">Admin Panel ဖွင့်နေသည်...</div>}><AdminPanel supabase={supabase} onClose={() => setAdminOpen(false)} /></React.Suspense>}
     </div>
   );
 }
