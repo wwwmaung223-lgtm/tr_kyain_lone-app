@@ -184,7 +184,7 @@ begin
   if p_student_name is null or length(trim(p_student_name))<2 or length(trim(p_student_name))>100 then
     raise exception 'Enter a valid student name';
   end if;
-  select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code)) and status in ('waiting','live');
+  select * into v_room from public.exam_rooms where join_code=upper(trim(p_join_code)) and status='live';
   if not found then raise exception 'Exam room not found or closed'; end if;
   select student_data into v_student_data from public.quiz_assessments where code=v_room.quiz_code and is_published=true;
   if v_student_data is null then raise exception 'Published exam content not found'; end if;
