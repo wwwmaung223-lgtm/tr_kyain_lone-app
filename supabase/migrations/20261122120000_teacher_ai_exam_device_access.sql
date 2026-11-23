@@ -122,6 +122,7 @@ create table if not exists public.exam_room_participants (
   room_id uuid not null references public.exam_rooms(id) on delete cascade,
   student_name text not null,
   student_code text,
+  participant_token uuid not null default gen_random_uuid(),
   avatar_path text,
   status text not null default 'joined' check(status in ('joined','in_progress','completed')),
   answers jsonb not null default '{}'::jsonb,
@@ -192,7 +193,7 @@ begin
     if found then
       update public.exam_room_participants set student_name=left(trim(p_student_name),100),last_saved_at=now()
         where id=v_participant.id;
-      return jsonb_build_object('participant_id',v_participant.id,'room_id',v_room.id,
+      return jsonb_build_object('participant_id',v_participant.id,'participant_token',v_participant.participant_token,'room_id',v_room.id,
         'quiz_code',v_room.quiz_code,'room_status',v_room.status,'answers',v_participant.answers,
         'participant_status',v_participant.status);
     end if;
@@ -206,7 +207,7 @@ begin
 end;
 $$;
 
-create or replace function public.save_exam_room_answers(p_join_code text, p_participant_id uuid, p_answers jsonb, p_submit boolean default false)
+create or replace function public.save_exam_room_answers(p_join_code text, p_participant_id uuid, p_participant_token uuid, p_answers jsonb, p_submit boolean default false)
 returns jsonb
 language plpgsql
 security definer
@@ -223,9 +224,9 @@ begin
   update public.exam_room_participants set answers=p_answers,
     status=case when p_submit then 'completed' else 'in_progress' end,
     last_saved_at=now(),submitted_at=case when p_submit then now() else null end
-    where id=p_participant_id and room_id=v_room_id and status <> 'completed';
+    where id=p_participant_id and room_id=v_room_id and participant_token=p_participant_token and status <> 'completed';
   if not found then
-    if exists(select 1 from public.exam_room_participants where id=p_participant_id and room_id=v_room_id and status='completed') then
+    if exists(select 1 from public.exam_room_participants where id=p_participant_id and room_id=v_room_id and participant_token=p_participant_token and status='completed') then
       raise exception 'Exam response has already been submitted';
     end if;
     raise exception 'Participant not found';
@@ -236,8 +237,8 @@ $$;
 
 revoke all on function public.join_exam_room(text,text,text) from public;
 grant execute on function public.join_exam_room(text,text,text) to anon, authenticated;
-revoke all on function public.save_exam_room_answers(text,uuid,jsonb,boolean) from public;
-grant execute on function public.save_exam_room_answers(text,uuid,jsonb,boolean) to anon, authenticated;
+revoke all on function public.save_exam_room_answers(text,uuid,uuid,jsonb,boolean) from public;
+grant execute on function public.save_exam_room_answers(text,uuid,uuid,jsonb,boolean) to anon, authenticated;
 
 revoke all on function public.grant_teacher_ai_lifetime(text,text) from public, anon;
 grant execute on function public.grant_teacher_ai_lifetime(text,text) to authenticated;
