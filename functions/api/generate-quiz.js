@@ -129,74 +129,63 @@ export async function onRequest({ request, env }) {
   if (!models.length) return json({ success: false, error: 'Gemini model စာရင်း မရပါ။ API Key သို့မဟုတ် API quota ကို စစ်ဆေးပါ။' }, 502);
 
   const imagePart = { inline_data: { mime_type: mimeType, data: base64Data } };
-  const extractionPrompt = `You are an expert OCR and document-understanding agent for school materials.
-Read the uploaded page carefully. Preserve all meaningful educational content, formulas, symbols, diagrams described in words, headings, examples, and any questions/answer choices exactly as printed.
-Return JSON only with this schema:
-{"document_title":"string","source_language":"string","source_text":"complete faithful transcription in reading order","existing_questions":[{"question":"string","choices":["string"],"printed_answer":"string or empty","marks":number or null}],"uncertain_parts":["short description of anything unreadable"]}
-Do not invent missing words. Mark unreadable text as [unclear]. Keep page order. If the image contains exercises, include every exercise item in existing_questions. If it contains lesson notes rather than questions, existing_questions may be empty.`;
-  let extracted;
-  let lastError;
-  for (const model of models.slice(0, 3)) {
-    try {
-      extracted = await generate(model, key, [{ text: extractionPrompt }, imagePart]);
-      break;
-    } catch (e) { lastError = e; if (e.status === 429) break; }
-  }
-  if (!extracted) return json({ success: false, error: lastError?.status === 429
-    ? 'Gemini Free quota ပြည့်နေပါတယ်။ ခဏနားပြီး ပြန်စမ်းပါ။'
-    : `ပုံထဲက စာသားဖတ်တဲ့အဆင့် မအောင်မြင်ပါ: ${lastError?.message || 'Unknown error'}` }, 502);
-  const sourceText = String(extracted.source_text || '').trim();
-  const existingQuestions = Array.isArray(extracted.existing_questions) ? extracted.existing_questions : [];
-  if (!sourceText && !existingQuestions.length) return json({
-    success: false, error: 'ပုံထဲက စာသားကို မဖတ်နိုင်ပါ။ ပိုကြည်လင်တဲ့ပုံ၊ အလင်းကောင်းတဲ့ပုံ သို့မဟုတ် စာမျက်နှာတစ်မျက်နှာချင်း တင်ပေးပါ။',
-    uncertainParts: extracted.uncertain_parts || []
-  }, 422);
+  const prompt = \`You are a multimodal OCR specialist, experienced school teacher, assessment designer and answer-key verifier.
+First read the uploaded worksheet/photo/PDF page carefully. Internally transcribe the source in reading order, identify its topic, facts, examples, formulas, exercises and any printed answer choices. Then create a classroom-ready quiz grounded ONLY in that uploaded source.
 
-  const generationPrompt = `You are a senior teacher, assessment designer and answer-key verifier.
-Create a classroom-ready quiz using ONLY the source material below.
 TEACHER SETTINGS:
-Subject: ${settings.subject || 'Infer from source'}
-Grade: ${settings.grade || 'Appropriate to source'}
-Difficulty: ${settings.difficulty || 'Balanced'}
-Question format: ${settings.questionType || 'Mixed questions'}
-Requested number: ${requestedCount}
-Language: ${settings.language || 'Preserve source language'}
-Additional instruction: ${String(customInstruction).slice(0, 700)}
+Subject: \${settings.subject || 'Infer from source'}
+Grade: \${settings.grade || 'Appropriate to source'}
+Difficulty: \${settings.difficulty || 'Balanced'}
+Question format: \${settings.questionType || 'Mixed questions'}
+Requested number: \${requestedCount}
+Language: \${settings.language || 'Preserve source language'}
+Additional instruction: \${String(customInstruction).slice(0, 700)}
 
-SOURCE DOCUMENT TITLE: ${extracted.document_title || ''}
-SOURCE TEXT:
-${sourceText.slice(0, 24000)}
-EXISTING EXERCISES:
-${JSON.stringify(existingQuestions).slice(0, 12000)}
-OCR UNCERTAINTIES:
-${JSON.stringify(extracted.uncertain_parts || [])}
+Return ONLY valid JSON using this schema:
+{"title":"short title","description":"student instruction","sourceText":"faithful concise transcription of the key source content","uncertainParts":["unreadable or ambiguous parts"],"questions":[{"type":"mcq or written","text":"complete question","marks":1,"options":["choice A","choice B","choice C","choice D"],"correctOption":0}]}
 
-Return JSON only:
-{"title":"short title","description":"short student instruction","questions":[{"type":"mcq or written","text":"question","marks":1,"options":["A text","B text","C text","D text"],"correctOption":0}]}
 QUALITY RULES:
-- Generate exactly ${requestedCount} useful questions when the source has enough information. If it does not, return fewer rather than inventing facts.
-- If source is an existing question paper or exercise sheet, preserve its tested skills and wording; you may improve formatting but do not silently change what is being tested.
-- If source is lesson notes/textbook content, create fresh questions that test the key ideas in the source.
-- Use a balanced mix of recall, understanding and application appropriate to the grade and difficulty.
-- For MCQ, provide 3 or 4 plausible distinct options. Never add filler options such as "None of the above" just to reach four.
-- correctOption must be the zero-based index of the demonstrably correct answer. Check it against the source; if the source does not support a reliable key, use type "written" instead.
-- Use written questions for calculations, explanations, essays, and tasks that cannot be fairly graded by one MCQ answer.
-- Preserve mathematical notation, units, names and subject terminology. Do not fabricate diagrams or facts.
-- For Myanmar + English, use clear natural Myanmar and English while preserving the original technical meaning.
-- Every question must be self-contained. Avoid duplicates and vague questions.
-- Output only valid JSON.`;
+- Read the actual uploaded material, not the sample quiz or assumed subject. Preserve important terminology, formulas, units, names and facts.
+- Generate up to \${requestedCount} useful questions. If the source does not support that many, return fewer rather than inventing content.
+- If the source is an existing worksheet/question paper, preserve its tested skills and key wording. Do not silently change what is being tested.
+- If the source is lesson notes/textbook material, create new questions that test the key ideas actually present in it.
+- Use a balanced progression of recall, understanding and application appropriate to grade and difficulty.
+- MCQ choices must be plausible, distinct and supported by the topic. Use 3 or 4 choices; never add filler choices just to reach four.
+- correctOption is a zero-based index. Verify the answer against the source and your subject knowledge. If uncertain, make it a written question instead of guessing.
+- Use written questions for explanations, essays, calculations and questions that cannot be fairly assessed by one MCQ.
+- Avoid duplicate, vague, trick or ambiguous questions. Each question must be self-contained.
+- If Myanmar + English is selected, provide clear natural bilingual wording while preserving technical meaning.
+- Do not claim OCR certainty for blurry text. Put unclear sections in uncertainParts.
+- Output JSON only; no markdown fences or commentary.\`;
   let result;
   let generationError;
-  for (const model of models.slice(0, 3)) {
+  for (const model of models.slice(0, 2)) {
     try {
-      result = await generate(model, key, [{ text: generationPrompt }]);
+      // One multimodal pass avoids the previous two sequential long-running Gemini requests.
+      result = await generate(model, key, [{ text: prompt }, imagePart], 25000);
       break;
-    } catch (e) { generationError = e; if (e.status === 429) break; }
+    } catch (e) {
+      generationError = e;
+      if (e.status === 429 || e.name === 'AbortError') break;
+    }
   }
-  if (!result) return json({ success: false, error: generationError?.status === 429
-    ? 'Gemini Free quota ပြည့်နေပါတယ်။ ခဏနားပြီး ပြန်စမ်းပါ။'
-    : `မေးခွန်းဖန်တီးတဲ့အဆင့် မအောင်မြင်ပါ: ${generationError?.message || 'Unknown error'}` }, 502);
-
+  if (!result) {
+    const aborted = generationError?.name === 'AbortError' || /abort/i.test(generationError?.message || '');
+    return json({ success: false, error: generationError?.status === 429
+      ? 'Gemini Free quota ပြည့်နေပါတယ်။ ခဏနားပြီး ပြန်စမ်းပါ။'
+      : aborted
+        ? 'AI က အချိန်မီ မတုံ့ပြန်နိုင်ပါ။ ပုံအရွယ်အစားကို 3MB အောက်ထားပြီး စာမျက်နှာတစ်မျက်နှာချင်း တင်ပေးပါ။'
+        : \`AI မေးခွန်းဖန်တီးမှု မအောင်မြင်ပါ: \${generationError?.message || 'Unknown error'}\` }, 502);
+  }
+  const sourceText = String(result.sourceText || '').trim();
+  const uncertainParts = Array.isArray(result.uncertainParts) ? result.uncertainParts : [];
+  if (!Array.isArray(result.questions) || !result.questions.length) return json({
+    success: false,
+    error: sourceText
+      ? 'ပုံထဲက အကြောင်းအရာကို ဖတ်နိုင်ပေမဲ့ မေးခွန်းမထုတ်နိုင်ပါ။ ပိုကြည်လင်တဲ့ပုံ သို့မဟုတ် စာမျက်နှာတစ်မျက်နှာချင်း စမ်းပါ။'
+      : 'ပုံထဲက စာသားကို မဖတ်နိုင်ပါ။ ပိုကြည်လင်တဲ့ပုံ၊ အလင်းကောင်းတဲ့ပုံ သို့မဟုတ် စာမျက်နှာတစ်မျက်နှာချင်း တင်ပေးပါ။',
+    uncertainParts
+  }, 422);
   const questions = cleanQuestions(result.questions, requestedCount);
   if (!questions.length) return json({ success: false, error: 'ဖတ်ရှုထားတဲ့စာသားကနေ မေးခွန်းထုတ်မရပါ။ ပိုကြည်လင်တဲ့ပုံ သို့မဟုတ် အခြားစာမျက်နှာကို စမ်းပါ။' }, 422);
   const missingKeys = questions.filter(q => q.type === 'mcq' && q.correctOption === null).length;
@@ -207,10 +196,9 @@ QUALITY RULES:
     questions,
     diagnostics: {
       sourceTextLength: sourceText.length,
-      extractedExerciseCount: existingQuestions.length,
       generatedQuestionCount: questions.length,
       requestedQuestionCount: requestedCount,
-      uncertainParts: extracted.uncertain_parts || [],
+      uncertainParts,
       mcqAnswersNeedingTeacherReview: missingKeys
     }
   });
