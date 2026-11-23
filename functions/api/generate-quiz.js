@@ -23,8 +23,8 @@ async function pickModels(key) {
   return (data.models || [])
     .filter(m => /flash/i.test(m.name) && (m.supportedGenerationMethods || []).includes('generateContent') && !bad.test(m.name))
     .map(m => {
-      const name = m.name.replace(/^models\\//, '');
-      const version = parseFloat((name.match(/gemini-(\\d+(?:\\.\\d+)?)/) || [0, 0])[1]);
+      const name = m.name.replace(/^models\//, '');
+      const version = parseFloat((name.match(/gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
       return { name, rank: version * 100 + (/latest/i.test(name) ? 1 : 0) - (/(preview|exp|lite)/i.test(name) ? 5 : 0) };
     }).sort((a, b) => b.rank - a.rank).map(x => x.name);
 }
@@ -40,7 +40,7 @@ async function verifyTeacher(env, token) {
   } catch { return false; }
 }
 function extractJson(text) {
-  const clean = String(text || '').replace(/^\uFEFF/, '').replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim();
+  const clean = String(text || '').replace(/^\uFEFF/, '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   const start = clean.indexOf('{');
   const end = clean.lastIndexOf('}');
   if (start < 0 || end <= start) throw new Error('AI က ဖတ်ရှုရလဒ်ကို JSON အဖြစ် မပေးနိုင်ပါ။ ထပ်စမ်းပါ။');
@@ -53,7 +53,7 @@ function cleanQuestions(raw, requestedCount) {
     const text = String(q?.text || '').trim();
     if (!text) continue;
     const options = Array.isArray(q?.options)
-      ? q.options.map(o => String(o).replace(/^\\s*\\(?[A-Da-d][\\).:]\\s+/, '').trim()).filter(Boolean).slice(0, 4)
+      ? q.options.map(o => String(o).replace(/^\s*\(?[A-Da-d][\).:]\s+/, '').trim()).filter(Boolean).slice(0, 4)
       : [];
     const type = q?.type === 'written' || options.length < 2 ? 'written' : 'mcq';
     let correctOption = null;
@@ -110,7 +110,7 @@ export async function onRequest({ request, env }) {
   if (!ALLOWED.includes(mimeType)) return json({ success: false, error: 'JPEG, PNG, WebP သို့မဟုတ် PDF ဖိုင်သာ တင်နိုင်ပါတယ်။' }, 400);
 
   let settings = {};
-  for (const line of String(customInstruction).split('\\n')) {
+  for (const line of String(customInstruction).split('\n')) {
     const idx = line.indexOf(':');
     if (idx < 0) continue;
     const label = line.slice(0, idx).trim().toLowerCase();
