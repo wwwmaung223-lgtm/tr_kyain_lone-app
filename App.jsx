@@ -2279,8 +2279,8 @@ export default function App() {
         {/* ==================================================================
             BOTTOM FLOATING GLASS TAB BAR (Mobile Navigation)
            ================================================================== */}
-        <nav aria-label="Main navigation" className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.25rem)] max-w-[560px]">
-          <div className="ios-glass-strong rounded-[24px] p-1 grid grid-cols-6 gap-0.5 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
+        <nav aria-label="Main navigation" className="bottom-navigation fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-40 w-[calc(100%-1rem)] max-w-[560px] -translate-x-1/2">
+          <div className="bottom-navigation-grid ios-glass-strong rounded-[22px] p-1 grid grid-cols-6 gap-0.5 shadow-[0_12px_35px_rgba(79,70,229,0.2)]">
             <button
               type="button"
               onClick={() => setActiveTab('creator')}
@@ -2345,7 +2345,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => openTeacherTab('dashboard')}
-              className={`relative py-2 px-2 rounded-[22px] flex flex-col items-center justify-center gap-0.5 transition-all ${
+              className={`relative min-w-0 w-full py-2 px-0.5 rounded-[18px] flex flex-col items-center justify-center gap-0.5 transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900'
